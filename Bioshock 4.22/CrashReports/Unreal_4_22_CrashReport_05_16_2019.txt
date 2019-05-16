@@ -1,0 +1,11 @@
+1. Open Unreal
+2. Press 'Restore Now' for the '...Restore previously open assets' prompt
+3. Go to Blueprint: MagizineSystem
+4. Go to Function: GetRound
+5. Go to node:  Return Node
+6. Go to Detail: Outputs
+7. Change type of 'Round' from 'Actor; Object Reference' to 'Round System; Object Reference'
+8. Press Compile Button
+9. Observe crash
+
+Note: I have reproduced the crash 4 out of 4 times. I have only followed the optimal repo path above for this final submission.
