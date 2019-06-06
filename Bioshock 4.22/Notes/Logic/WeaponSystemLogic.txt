@@ -1,0 +1,128 @@
+////////////////////////////////////////////////////////////////////////////////
+
+!Trigger Group (open):
+
+////////////////////////////////////////////////////////////////////////////////
+
+Feeding:
+  -bolt beginning to close (animation + sound)
+  -transitionRoundFromMagToBolt (transfer of object)
+
+{
+  animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
+
+  playAnimation(boltAnimation);
+  playSound(BoltPos<sound>(boltPosFeeding));
+
+  BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+Chambering:
+  -bolt finsihing to close (animation + sound)
+  -transitionRoundFromBoltToChamber (transfer of object)
+
+{
+  animation* boltAnimation = BoltPos<animation>(boltPosChambering);
+
+  playAnimation(boltAnimation);
+  playSound(BoltPos<sound>(boltPosChambering));
+
+  BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+*Locking:
+  -*ensuring bolt is closed (logic check)
+  -locking bolt (animation + sound)
+
+{
+  if(bolt.distanceFromClosed < distanceForLocking)
+  {
+
+  playAnimation(BoltPos<animation>(boltPosLocking));
+  playSound(BoltPos<sound>(boltPosLocking));
+
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+!Trigger Group (close)
+
+////////////////////////////////////////////////////////////////////////////////
+
+Firing:
+  -*engage hammer (animation + sound)
+  -activateRoundInChamber (activate external system)
+  -if successful: continue (return true)
+  -else: don't continue (return false)
+
+{
+  playAnimation(HammerPos<animation>(hammerPosEngaged));
+  playSound(HammerPos<sound>(hammerPosEngaged));
+
+  if(activateRoundInChamber())
+  {
+      //TODO: Find solution to given issue that state "unlocking" may not
+      //      exist for it is optional
+    SetState("Unlocking");
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+*Unlocking
+  -unlocking bolt (animation + sound)
+
+{
+  playAnimation(BoltPos<animation>(boltPosChambering));
+  playSound(BoltPos<sound>(boltPosChambering));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+Extracting:
+  -transitionRound(Remains)FromChamberToBolt (transfer of object)
+
+{
+  animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
+
+  playAnimation(boltAnimation);
+  playSound(BoltPos<sound>(boltPosExtracting));
+
+  BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+Ejecting:
+  -ejectRoundFromBolt (sound + particle effects + spawning object)
+
+{
+  playSound(firearm.ejectionSound);
+  spawnParticleEffect(round.ejectionParticleEffects);
+  spawnObject(bolt.Round);
+  bolt.Round = NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+*Cocking
+  -ready hammer (animation + sound)
+
+{
+  playAnimation(HammerPos<animation>(hammerPosFullCock));
+  playSound(HammerPos<sound>(hammerPosFullCock));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+*optional; cases where state maybe unnecessary for the core functionality of the system
