@@ -1,6 +1,14 @@
 ////////////////////////////////////////////////////////////////////////////////
 
-!Trigger Group (open):
+!Trigger Group (open): Activate at 'Feeding' stage
+  -engageTrigger (run external logic)
+
+{
+  if(state.current == state("Feeding"))
+  {
+    engageEntireTrigger();
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -15,6 +23,8 @@ Feeding:
   playSound(BoltPos<sound>(boltPosFeeding));
 
   BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -30,6 +40,8 @@ Chambering:
   playSound(BoltPos<sound>(boltPosChambering));
 
   BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,17 +57,21 @@ Chambering:
   playAnimation(BoltPos<animation>(boltPosLocking));
   playSound(BoltPos<sound>(boltPosLocking));
 
-    return true;
-  }
-  else
-  {
-    return false;
+    SetState.next();
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-!Trigger Group (close)
+!Trigger Group (close): Activate at 'Firing' stage
+  -engageTrigger (run external logic)
+
+{
+  if(state.current == state("Firing"))
+  {
+    engageEntireTrigger();
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -71,9 +87,7 @@ Firing:
 
   if(activateRoundInChamber())
   {
-      //TODO: Find solution to given issue that state "unlocking" may not
-      //      exist for it is optional
-    SetState("Unlocking");
+    SetState.next(); //SetState("Firing", AFTER);
   }
 }
 
@@ -85,6 +99,8 @@ Firing:
 {
   playAnimation(BoltPos<animation>(boltPosChambering));
   playSound(BoltPos<sound>(boltPosChambering));
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -99,6 +115,8 @@ Extracting:
   playSound(BoltPos<sound>(boltPosExtracting));
 
   BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,6 +129,8 @@ Ejecting:
   spawnParticleEffect(round.ejectionParticleEffects);
   spawnObject(bolt.Round);
   bolt.Round = NULL;
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,8 +141,68 @@ Ejecting:
 {
   playAnimation(HammerPos<animation>(hammerPosFullCock));
   playSound(HammerPos<sound>(hammerPosFullCock));
+
+  SetState.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 *optional; cases where state maybe unnecessary for the core functionality of the system
+
+FUNCTIONS
+////////////////////////////////////////////////////////////////////////////////
+
+void engageEntireTrigger()
+{
+  setTriggerEngagement(0.0f);
+}
+
+//param a: value between 0.0f and 1.0f
+//          1.0f being full RELEASE
+//          0.0f being full PULL
+void setTrigger(float a)
+{
+#ifdef DEBUG
+  if(a > 1.0f || a < 0.0f)
+  {
+    debug.log();
+    return;
+  }
+#endif
+
+  std::vector<struct triggerStage>::const_iterator it = ti.begin();
+
+  while(it != ti.end())
+  {
+      //TODO: Work out logic in notebook
+    if(a >= it->triggerPos)
+    {
+      break;
+    }
+
+    ++it;
+  }
+
+  if(it != ti.end())
+  {
+    it->activateStage();
+  }
+}
+
+struct trigger
+{
+  enum
+  {
+    PULL    = 0,
+    RELEASE = 1
+  }
+
+    //sorted array using 'triggerPos' as key in 
+  std::vector<struct triggerStage>ti[];
+};
+
+struct triggerStage
+{
+  virtual void activateStage() = 0;
+  float triggerPos; //value from 0.0f to 1.0f for this stage to be activated
+};
