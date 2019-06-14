@@ -4,7 +4,8 @@
   -engageTrigger (run external logic)
 
 {
-  if(state.current == state("Feeding"))
+    //trigger.activationState = 'Feeding'
+  if(state.current == trigger.activationState)
   {
     engageEntireTrigger();
   }
@@ -18,13 +19,12 @@ Feeding:
 
 {
   animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
+  BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
 
   playAnimation(boltAnimation);
   playSound(BoltPos<sound>(boltPosFeeding));
 
-  BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
-
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,13 +35,12 @@ Chambering:
 
 {
   animation* boltAnimation = BoltPos<animation>(boltPosChambering);
+  BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
 
   playAnimation(boltAnimation);
   playSound(BoltPos<sound>(boltPosChambering));
 
-  BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
-
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,13 +50,13 @@ Chambering:
   -locking bolt (animation + sound)
 
 {
-  if(bolt.distanceFromClosed < distanceForLocking)
+    //float distanceForLocking - 
+  if(bolt.distanceFromClosed() < bolt.distanceForLocking)
   {
+    playAnimation(BoltPos<animation>(boltPosLocking));
+    playSound(BoltPos<sound>(boltPosLocking));
 
-  playAnimation(BoltPos<animation>(boltPosLocking));
-  playSound(BoltPos<sound>(boltPosLocking));
-
-    SetState.next();
+    state.next();
   }
 }
 
@@ -67,7 +66,8 @@ Chambering:
   -engageTrigger (run external logic)
 
 {
-  if(state.current == state("Firing"))
+    //trigger.activationState = 'Firing'
+  if(state.current == trigger.activationState)
   {
     engageEntireTrigger();
   }
@@ -78,8 +78,8 @@ Chambering:
 Firing:
   -*engage hammer (animation + sound)
   -activateRoundInChamber (activate external system)
-  -if successful: continue (return true)
-  -else: don't continue (return false)
+  -if successful: continue
+  -else: don't continue
 
 {
   playAnimation(HammerPos<animation>(hammerPosEngaged));
@@ -87,7 +87,7 @@ Firing:
 
   if(activateRoundInChamber())
   {
-    SetState.next(); //SetState("Firing", AFTER);
+    state.next(); //SetState("Firing", AFTER);
   }
 }
 
@@ -100,7 +100,7 @@ Firing:
   playAnimation(BoltPos<animation>(boltPosChambering));
   playSound(BoltPos<sound>(boltPosChambering));
 
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,13 +110,12 @@ Extracting:
 
 {
   animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
+  BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
 
   playAnimation(boltAnimation);
   playSound(BoltPos<sound>(boltPosExtracting));
 
-  BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
-
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +129,7 @@ Ejecting:
   spawnObject(bolt.Round);
   bolt.Round = NULL;
 
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -142,14 +141,14 @@ Ejecting:
   playAnimation(HammerPos<animation>(hammerPosFullCock));
   playSound(HammerPos<sound>(hammerPosFullCock));
 
-  SetState.next();
+  state.next();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 *optional; cases where state maybe unnecessary for the core functionality of the system
 
-FUNCTIONS
+MACROS
 ////////////////////////////////////////////////////////////////////////////////
 
 void engageEntireTrigger()
@@ -157,6 +156,30 @@ void engageEntireTrigger()
   setTriggerEngagement(0.0f);
 }
 
+void manualUnchamber()
+{
+  if(state.current == state.chambering)
+  {
+  }
+}
+
+//param val - value between 0.0f and 1.0f
+void checkChamber(float val)
+{
+  float valToUse = val;
+
+  if(val < bolt.feedPoint)
+  {
+    valToUse = bolt.feedPoint;
+  }
+
+  bolt.setPos(valToUse);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+FUNCTIONS
+////////////////////////////////////////////////////////////////////////////////
 //param a: value between 0.0f and 1.0f
 //          1.0f being full RELEASE
 //          0.0f being full PULL
@@ -189,6 +212,24 @@ void setTrigger(float a)
   }
 }
 
+float distanceFromClosed()
+{
+  return ;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+DATA STRUCTURES
+////////////////////////////////////////////////////////////////////////////////
+
+struct triggerStage
+{
+  virtual void activateStage() = 0;
+  float triggerPos;      //value from 0.0f to 1.0f for this stage to be activated
+  float rateOfPosChangeFixed;    // changeInPos / seconds
+  float rateOfPosChangeRelative; // seconds to get to newPos
+};
+
 struct trigger
 {
   enum
@@ -197,12 +238,29 @@ struct trigger
     RELEASE = 1
   }
 
+  triggerStage activationState;
+
     //sorted array using 'triggerPos' as key in 
-  std::vector<struct triggerStage>ti[];
+  std::vector<triggerStage>ti[];
 };
 
-struct triggerStage
+struct bolt
 {
-  virtual void activateStage() = 0;
-  float triggerPos; //value from 0.0f to 1.0f for this stage to be activated
+  float curPos;
+
+
+  float distanceFromClosed()
+  {
+  }
+
+  class Round*;
+
+  //TODO:  //distanceForLocking
+  feedPoint
+
+  void setPos(float valToUse)
+  {
+  }
 };
+
+////////////////////////////////////////////////////////////////////////////////
