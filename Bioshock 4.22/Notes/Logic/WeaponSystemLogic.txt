@@ -222,44 +222,74 @@ float distanceFromClosed()
 DATA STRUCTURES
 ////////////////////////////////////////////////////////////////////////////////
 
+//Responsible to talking to action of weapon system
 struct triggerStage
 {
-  virtual void activateStage() = 0;
-  float triggerPos;      //value from 0.0f to 1.0f for this stage to be activated
-  float rateOfPosChangeFixed;    // changeInPos / seconds
-  float rateOfPosChangeRelative; // seconds to get to newPos
+  void activateStage();
+  float triggerPos;              //value from 0.0f to 1.0f for this stage to be activated
+  float rateOfPosChangeFixed;    // changeInPos / time(seconds)
+  float rateOfPosChangeRelative; // seconds to get to newPos; (newPos - curPos) / time(seconds
+};
+
+//Responsible for transferring round
+// ^(mag->bolt->chamber; chamber->bolt->ejectionPort)
+struct bolt
+{
+  unsigned curStage;
+
+    //sorted array using 'triggerPos' as key in 
+  std::vector<triggerStage>ti[];
+
+  float curPos;
+  float curRateOfChange;
+  class Round*;
+
+
+    //TODO: Remove and use vector
+  triggerStage pointOpen;
+  triggerStage pointChamber;
+  triggerStage pointExtract;
+  triggerStage pointEject;
+  triggerStage pointClose;
+
+    //Constructor
+  bolt() : curStage(0), ti(5)
+  {
+    ti[0] = ; //WIP
+
+    BindEvent(pointOpen.activateStage,    pointOpen.triggerPos);
+    BindEvent(pointChamber.activateStage, pointChamber.triggerPos);
+    BindEvent(pointExtract.activateStage, pointExtract.triggerPos);
+    BindEvent(pointEject.activateStage,   pointEject.triggerPos);
+    BindEvent(pointClose.activateStage,   pointClose.triggerPos);
+  }
+
+    //returns absolute value for distance
+  float distanceFromHereTo(float val)
+  {
+    return abs(curPos - val);
+  }
+
+  void setPos(float val)
+  {
+    if(val)
+
+    //From, To, Rate
+    my_lerp(curPos, val, curRateOfChange);
+  }
 };
 
 struct trigger
 {
+  unsigned curStage;
+
+    //sorted array using 'triggerPos' as key in 
+  std::vector<triggerStage>ti[];
+
   enum
   {
     PULL    = 0,
     RELEASE = 1
-  }
-
-  triggerStage activationState;
-
-    //sorted array using 'triggerPos' as key in 
-  std::vector<triggerStage>ti[];
-};
-
-struct bolt
-{
-  float curPos;
-
-
-  float distanceFromClosed()
-  {
-  }
-
-  class Round*;
-
-  //TODO:  //distanceForLocking
-  feedPoint
-
-  void setPos(float valToUse)
-  {
   }
 };
 
