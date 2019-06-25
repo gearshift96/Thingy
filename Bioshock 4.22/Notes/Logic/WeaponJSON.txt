@@ -1,0 +1,34 @@
+{
+  "bolt"
+  {
+    "bolt_open"
+    {
+      "activateStage" : "SCRIPT_bolt_open",
+      "triggerPos"    : 0.0f
+    }
+
+    "bolt_chamber"
+    {
+      "activateStage" : "SCRIPT_bolt_chamber",
+      "triggerPos"    : 0.25f
+    }
+
+    "bolt_extract"
+    {
+      "activateStage" : "SCRIPT_bolt_extract",
+      "triggerPos"    : 0.5f
+    }
+
+    "bolt_eject"
+    {
+      "activateStage" : "SCRIPT_bolt_eject",
+      "triggerPos"    : 0.75f
+    }
+
+    "bolt_close"
+    {
+      "activateStage" : "SCRIPT_bolt_close",
+      "triggerPos"    : 1.0f
+    }
+  }
+}

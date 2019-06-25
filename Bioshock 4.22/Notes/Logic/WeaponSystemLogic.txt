@@ -219,57 +219,106 @@ float distanceFromClosed()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+HELPER FUNCTIONS
+////////////////////////////////////////////////////////////////////////////////
+
+triggerStage SetTriggerStage(JSONobj obj)
+{
+  triggerStage ts;
+
+    //Engine function call
+  ts.activateStage = GetScript(obj, "activateStage");
+  ts.triggerPos    = GetFloat(obj, "triggerPos");
+
+  return ts;
+}
+
+void WS_deserialize(string scriptName)
+{
+  JSONobj obj= parse(scriptName, "bolt");
+
+  while(obj.getNextObj() != nullptr)
+  {
+    ti.push_back(SetTriggerStage(obj.curObj());
+  }
+}
+
 DATA STRUCTURES
 ////////////////////////////////////////////////////////////////////////////////
 
-//Responsible to talking to action of weapon system
 struct triggerStage
 {
-  void activateStage();
-  float triggerPos;              //value from 0.0f to 1.0f for this stage to be activated
-  float rateOfPosChangeFixed;    // changeInPos / time(seconds)
-  float rateOfPosChangeRelative; // seconds to get to newPos; (newPos - curPos) / time(seconds
+    //Call using ()operator
+  SCRIPT activateStage;
+  string stageName;
+  float triggerPos;         //value from 0.0f to 1.0f for this stage to be activated
+  float rateOfChangeFactor; //rate at which to APPROACH this stage
+
+    // changeInPos / time(seconds)
+  void rateOfPosChangeFixed(float);
+
+    // seconds to get to newPos; (newPos - curPos) / time[in seconds]
+  void rateOfPosChangeRelative(float);
+};
+
+struct weaponComponent
+{
+  enum states
+  {
+    Before,
+    UpTo,
+    After
+  }
+
+  enum condition
+  {
+    fromAscending,
+    fromDecending,
+    fromBoth
+  }
+
+    //sorted array using 'triggerPos' as key 
+  std::vector<triggerStage>ti;
+  string name;
+  float curPos;
+  float curRateOfChange;
+  unsigned curStage;
+
+  void activateComponent(float); //value to set for curPos
+
+    //string: name of stage for component to act towards
+  void activateComponent(states, string);
 };
 
 //Responsible for transferring round
 // ^(mag->bolt->chamber; chamber->bolt->ejectionPort)
-struct bolt
+struct bolt: public weaponComponent
 {
-  unsigned curStage;
-
-    //sorted array using 'triggerPos' as key in 
-  std::vector<triggerStage>ti[];
-
-  float curPos;
-  float curRateOfChange;
+  void WS_deserialize(string);
   class Round*;
 
-
-    //TODO: Remove and use vector
-  triggerStage pointOpen;
-  triggerStage pointChamber;
-  triggerStage pointExtract;
-  triggerStage pointEject;
-  triggerStage pointClose;
-
     //Constructor
-  bolt() : curStage(0), ti(5)
+  bolt() : curStage(0)
   {
-    ti[0] = ; //WIP
+    WS_deserialize("WeaponJSON.txt");
 
-    BindEvent(pointOpen.activateStage,    pointOpen.triggerPos);
-    BindEvent(pointChamber.activateStage, pointChamber.triggerPos);
-    BindEvent(pointExtract.activateStage, pointExtract.triggerPos);
-    BindEvent(pointEject.activateStage,   pointEject.triggerPos);
-    BindEvent(pointClose.activateStage,   pointClose.triggerPos);
+    for(unsigned i = 0; i < ti.size(); ++i)
+    {
+      BindEvent(ti[i].activateStage, ti[i].triggerPos);
+    }
   }
 
+  //REVIEW
+#if 0
     //returns absolute value for distance
   float distanceFromHereTo(float val)
   {
     return abs(curPos - val);
   }
+#endif
 
+  //REVIEW
+#if 0
   void setPos(float val)
   {
     if(val)
@@ -277,20 +326,7 @@ struct bolt
     //From, To, Rate
     my_lerp(curPos, val, curRateOfChange);
   }
-};
-
-struct trigger
-{
-  unsigned curStage;
-
-    //sorted array using 'triggerPos' as key in 
-  std::vector<triggerStage>ti[];
-
-  enum
-  {
-    PULL    = 0,
-    RELEASE = 1
-  }
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////
