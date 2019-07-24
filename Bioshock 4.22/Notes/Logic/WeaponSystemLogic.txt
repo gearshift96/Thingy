@@ -246,13 +246,27 @@ void WS_deserialize(string scriptName)
 DATA STRUCTURES
 ////////////////////////////////////////////////////////////////////////////////
 
+/* //WIP
+struct triggerState
+{  
+}
+*/
+
 struct triggerStage
 {
+  enum triggerDirection : int
+  {
+    fromAscending,
+    fromDecending,
+    fromBoth
+  }
+
     //Call using ()operator
-  SCRIPT activateStage;
   string stageName;
-  float triggerPos;         //value from 0.0f to 1.0f for this stage to be activated
+  SCRIPT activateStage;
+  triggerDirection condition;
   float rateOfChangeFactor; //rate at which to APPROACH this stage
+  float triggerPos;         //value from 0.0f to 1.0f for this stage to be activated
 
     // changeInPos / time(seconds)
   void rateOfPosChangeFixed(float);
@@ -268,13 +282,6 @@ struct weaponComponent
     Before,
     UpTo,
     After
-  }
-
-  enum condition
-  {
-    fromAscending,
-    fromDecending,
-    fromBoth
   }
 
     //sorted array using 'triggerPos' as key 

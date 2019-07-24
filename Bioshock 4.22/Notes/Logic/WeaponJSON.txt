@@ -1,34 +1,52 @@
 {
-  "bolt"
+  "weaponCompName" : "bolt"
   {
-    "bolt_open"
+    "stageName" : "bolt_open"
     {
-      "activateStage" : "SCRIPT_bolt_open",
-      "triggerPos"    : 0.0f
+      "activateStage"      : "SCRIPT_bolt_open",
+      "condition"          : "fromBoth",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 0.0f
     }
 
-    "bolt_chamber"
+    "stageName" : "bolt_feeding"
     {
-      "activateStage" : "SCRIPT_bolt_chamber",
-      "triggerPos"    : 0.25f
+      "activateStage"      : "SCRIPT_bolt_feeding",
+      "condition"          : "fromAscending",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 0.27f
     }
 
-    "bolt_extract"
+    "stageName" : "bolt_eject"
     {
-      "activateStage" : "SCRIPT_bolt_extract",
-      "triggerPos"    : 0.5f
+      "activateStage"      : "SCRIPT_bolt_eject",
+      "condition"          : "fromDecending",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 0.33f
     }
 
-    "bolt_eject"
+    "stageName" : "bolt_chamber"
     {
-      "activateStage" : "SCRIPT_bolt_eject",
-      "triggerPos"    : 0.75f
+      "activateStage"      : "SCRIPT_bolt_chamber",
+      "condition"          : "fromAscending",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 0.93f
     }
 
-    "bolt_close"
+    "stageName" : "bolt_extract"
     {
-      "activateStage" : "SCRIPT_bolt_close",
-      "triggerPos"    : 1.0f
+      "activateStage"      : "SCRIPT_bolt_extract",
+      "condition"          : "fromDecending",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 0.93f
+    }
+
+    "stageName" : "bolt_close"
+    {
+      "activateStage"      : "SCRIPT_bolt_close",
+      "condition"          : "fromBoth",
+      "rateOfChangeFactor" : 0.0f,
+      "triggerPos"         : 1.0f
     }
   }
 }
