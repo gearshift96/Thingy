@@ -246,21 +246,23 @@ void WS_deserialize(string scriptName)
 DATA STRUCTURES
 ////////////////////////////////////////////////////////////////////////////////
 
+enum triggerDirection : int
+{
+  fromAscending,
+  fromDecending,
+  fromBoth
+}
+
 /* //WIP
 struct triggerState
-{  
+{
+  triggerDirection trigDir;
+  
 }
 */
 
 struct triggerStage
 {
-  enum triggerDirection : int
-  {
-    fromAscending,
-    fromDecending,
-    fromBoth
-  }
-
     //Call using ()operator
   string stageName;
   SCRIPT activateStage;
