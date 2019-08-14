@@ -266,78 +266,89 @@ enum triggerDirection //: int
 
 struct weaponStage
 {
-  //std::string name;
-  float triggerPos;     //value from 0.0f to 1.0f for this stage to be activated
-  float rateOfChangeFactor; //rate at which to APPROACH this stage
-  void (*activationLogic)(); //function pointer
-  //SCRIPT activateStage;
+  //std::string name;         //UNUSED
+  //float triggerPos;         //UNUSED //value from 0.0f to 1.0f
+  //float rateOfChangeFactor; //UNUSED //rate at which to APPROACH this stage
+  void (*activationStage)();  //function pointer
+  //SCRIPT activateStage;     //UNUSED
 
     // changeInPos / time(seconds)
-  void rateOfPosChangeFixed(float);
+  //void rateOfPosChangeFixed(float);    //UNUSED
 
     // seconds to get to newPos; (newPos - curPos) / time[in seconds]
-  void rateOfPosChangeRelative(float);
+  //void rateOfPosChangeRelative(float); //UNUSED
 };
 
 struct weaponState
 {
-    //sorted array using 'triggerPos' as key 
-  std::vector<weaponStage> weaponStages;
+  std::vector<weaponStage> weaponStages; //sorted array using 'triggerPos' as key
+
+    //function pointer; activates all weaponStages
+  void activationState()
+  {
+    for(unsigned i = 0; i < weaponStages.size(); ++i)
+    {
+      weaponStages[i].activationStage();
+    }
+  }
 };
 
 //can be affected externally from system or by other weapon components
 struct weaponComponent
 {
-  //std::string name;
-  //float curPos;
-  //float curRateOfChange;
-  //unsigned /*weaponState*/ curStage;
+  //std::string name;                  //UNUSED
+  //float curPos;                      //UNUSED
+  //float curRateOfChange;             //UNUSED
+  //unsigned /*weaponState*/ curStage; //UNUSED
 
-  void activateComponent(float); //value to set for curPos
+  //void activateComponent(float); //value to set for curPos //DEPRECATED
 
-  weaponState ascending;
-  weaponState descending;
+  weaponState activate;
+  weaponState ready;
 };
 
 struct weaponSystem
 {
+/* //UNUSED
   enum states
   {
     Before,
     UpTo,
     After
   };
+*/
 
     //string: name of stage for component to act towards
-  void activateComponent(states, std::string);
+  //void activateComponent(states, std::string); //UNUSED
 
   std::vector<weaponComponent> weapComps;
 };
 
-#if 0
-struct weapCompW_Round : public weaponComponent
-{
-  weapCompW_Round(weapCompW_Round* compTransferDesintation_)
-  : compTransferDesintation(compTransferDesintation_)
-  {
-  }
-
-  ws_round *round = NULL;
-  weapCompW_Round *compTransferDesintation = NULL;
-};
-
+#if 1
 struct ws_projectile
 {
 };
 
 struct ws_round
 {
-  ws_projectile projectile;
+  ws_projectile *projectile;
 };
 
-struct ws_magizine : public weapCompW_Round
+struct weapComp_Round : public weaponComponent
 {
-  std::vector<ws_round> rounds;
+  ws_round *round = nullptr;
+  //weapComp_Round *compTransferDesintation = NULL; //DEPRECATED
+};
+
+struct ws_magizine : public weapComp_Round
+{
+  unsigned roundCount;
+  //std::vector<ws_round> rounds; //UNUSED
+};
+
+struct weapComp_Port : public weaponComponent
+{
+  ws_magizine *magizine = nullptr;
 };
 
 #endif
@@ -404,27 +415,54 @@ int main()
   weaponComponent hammer;
 
   //Firing
-  weaponComponent feedPort;
-  weaponComponent /*weapCompW_Round*/ bolt/*(chamber)*/;
-  weaponComponent /*weapCompW_Round*/ chamber/*(bolt)*/;
-  weaponComponent ejectionPort;
+  weapComp_Port   feedPort;
+  weapComp_Round  bolt/*(chamber)*/;
+  weapComp_Round  chamber/*(bolt)*/;
+  //weaponComponent ejectionPort; //UNUSED
 
   //Post-fire
   weaponComponent barrel;
   weaponComponent muzzle;
 
   //External Components
-  weaponComponent /*ws_magizine*/ detactableMagizine;
+  ws_magizine detactableMagizine;
 
 //////////////////////////////
 //Weapon States
 
-  //trigger.activationLogic = ;
+  weaponState trigger_act;
+  weaponState action_act;
+  weaponState hammer_act;
+  weaponState bolt_act;
+  weaponState chamber_act;
+
+  weaponState chamber_rdy;
+  weaponState bolt_rdy;
+  weaponState hammer_rdy;
+  //weaponState action_rdy;  //UNUSED
+  //weaponState trigger_rdy; //UNUSED
+
+  //trigger.activationStage = ;
 
 //////////////////////////////
 //Weapon Stages
 
-  //weaponStage bolt_feed;
+  weaponStage feeding;
+  weaponStage chambing;
+  //weaponStage closing; //UNUSED
+  weaponStage extracting;
+  weaponStage ejecting;
+  //weaponStage opening; //UNUSED
+
+//////////////////////////////
+//Assign Weapon Stages to Weapon Components
+
+  bolt_act.weaponStages.push_back(feeding);
+  bolt_act.weaponStages.push_back(chambing);
+  //bolt_act.weaponStages.push_back(closing); //UNUSED
+  bolt_rdy.weaponStages.push_back(extracting);
+  bolt_rdy.weaponStages.push_back(ejecting);
+  //bolt_rdy.weaponStages.push_back(opening); //UNUSED
 
 //////////////////////////////
 
