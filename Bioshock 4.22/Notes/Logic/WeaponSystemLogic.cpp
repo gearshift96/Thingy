@@ -27,7 +27,14 @@ static const unsigned defaultRoundCount = 10;
 */
 
 ////////////////////////////////////////
+//Opening:
 
+void logic_opening()
+{
+  std::cout << "Opening" << std::endl;
+}
+
+////////////////////////////////////////
 //Feeding:
 //  -bolt beginning to close (animation + sound)
 //  -transitionRoundFromMagToBolt (transfer of object)
@@ -48,7 +55,6 @@ void logic_feeding()
 }
 
 ////////////////////////////////////////
-
 //Chambering:
 //  -bolt finsihing to close (animation + sound)
 //  -transitionRoundFromBoltToChamber (transfer of object)
@@ -69,7 +75,6 @@ void logic_chambing()
 }
 
 ////////////////////////////////////////
-
 //*Locking:
 //  -*ensuring bolt is closed (logic check)
 //  -locking bolt (animation + sound)
@@ -88,7 +93,6 @@ void logic_chambing()
 */
 
 ////////////////////////////////////////
-
 //!Trigger Group (close): Activate at 'Firing' stage
 //  -engageTrigger (run external logic)
 
@@ -103,7 +107,6 @@ void logic_chambing()
 */
 
 ////////////////////////////////////////
-
 //Firing:
 //  -*engage hammer (animation + sound)
 //  -activateRoundInChamber (activate external system)
@@ -127,7 +130,6 @@ void logic_firing()
 }
 
 ////////////////////////////////////////
-
 //*Unlocking
 //  -unlocking bolt (animation + sound)
 
@@ -141,7 +143,6 @@ void logic_firing()
 */
 
 ////////////////////////////////////////
-
 //Extracting:
 //  -transitionRound(Remains)FromChamberToBolt (transfer of object)
 
@@ -161,7 +162,6 @@ void logic_extracting()
 }
 
 ////////////////////////////////////////
-
 //Ejecting:
 //  -ejectRoundFromBolt (sound + particle effects + spawning object)
 
@@ -180,24 +180,58 @@ void logic_ejecting()
 }
 
 ////////////////////////////////////////
+//Closing
 
+void logic_closing()
+{
+  std::cout << "Closing" << std::endl;
+}
+
+////////////////////////////////////////
 //*Cocking
 //  -ready hammer (animation + sound)
 
-/*
+void logic_cocking()
 {
+/*
   playAnimation(HammerPos<animation>(hammerPosFullCock));
   playSound(HammerPos<sound>(hammerPosFullCock));
 
   state.next();
-}
 */
+
+  std::cout << "Cocking" << std::endl;
+}
+
+////////////////////////////////////////
+//*Engaging
+//  -engage hammer (animation + sound)
+
+void logic_engaging()
+{
+  std::cout << "Engaging" << std::endl;
+}
+
+////////////////////////////////////////
+//Pulling
+
+void logic_pulling()
+{
+  std::cout << "Pulling" << std::endl;
+}
+
+////////////////////////////////////////
+//Releasing
+
+void logic_releasing()
+{
+  std::cout << "Releasing" << std::endl;
+}
 
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //MACROS
-
 #if 0
 
 void engageEntireTrigger()
@@ -325,14 +359,19 @@ struct weaponStage
 struct weaponState
 {
   std::vector<weaponStage> weaponStages; //sorted array using 'triggerPos' as key
+  //unsigned curStage = 0;
 
     //function pointer; activates all weaponStages
-  void activationState()
+  void activateState()
   {
     for(unsigned i = 0; i < weaponStages.size(); ++i)
     {
       weaponStages[i].activationStage();
     }
+  }
+
+  void readyState()
+  {
   }
 };
 
@@ -361,6 +400,18 @@ struct weaponSystem
   };
 */
 
+  enum WEAP_COMPS_ENUMS
+  {
+    TRIGGER,
+    ACTION,
+    HAMMER,
+    FEEDPORT,
+    BOLT,
+    CHAMBER,
+    BARREL,
+    MUZZLE
+  };
+
     //string: name of stage for component to act towards
   //void activateComponent(states, std::string); //UNUSED
 
@@ -376,17 +427,45 @@ struct ws_projectile
 struct ws_round
 {
   ws_projectile *projectile;
+  void activateRound();
 };
 
 struct weapComp_Round : public weaponComponent
 {
   ws_round *round = nullptr;
-  //weapComp_Round *compTransferDesintation = NULL; //DEPRECATED
+  void RoundTransferTo(weapComp_Round* dest)
+  {
+    if(round != nullptr)
+    {
+      if(dest->round == nullptr)
+      {
+        std::cout << "Transfering round to destination" << std::endl;
+        dest->round = round;
+        round = nullptr;
+      }
+      else
+      {
+        std::cout << "Round already at destination" << std::endl;
+      }
+    }
+    else
+    {
+      std::cout << "No round at source" << std::endl;
+    }
+  }
 };
 
 struct ws_magizine : public weapComp_Round
 {
   unsigned roundCount = defaultRoundCount;
+  void ReadyRound()
+  {
+    if(roundCount > 0 && round == nullptr)
+    {
+      --roundCount;
+      round = new ws_round;
+    }
+  }
   //std::vector<ws_round> rounds; //UNUSED
 };
 
@@ -470,46 +549,75 @@ int main()
 //Weapon States
 
   weaponState trigger_act;
-  weaponState action_act;
+  //weaponState action_act; //UNUSED
   weaponState hammer_act;
   weaponState bolt_act;
-  weaponState chamber_act;
+  //weaponState chamber_act; //UNUSED
 
-  weaponState chamber_rdy;
+  //weaponState chamber_rdy; //UNUSED
   weaponState bolt_rdy;
   weaponState hammer_rdy;
-  //weaponState action_rdy;  //UNUSED
-  //weaponState trigger_rdy; //UNUSED
+  //weaponState action_rdy; //UNUSED
+  weaponState trigger_rdy;
 
   //trigger.activationStage = ;
 
 //////////////////////////////
 //Weapon Stages
 
+    //Trigger
+  weaponStage pulling;
+  weaponStage releasing;
+
+    //Hammer
+  weaponStage cocking;
+  weaponStage engaging;
+
+    //Bolt
   weaponStage feeding;
   weaponStage chambing;
-  //weaponStage closing; //UNUSED
+  weaponStage closing;
   weaponStage extracting;
   weaponStage ejecting;
-  //weaponStage opening; //UNUSED
+  weaponStage opening;
 
 //////////////////////////////
 //Assign activationStage to weaponStage
 
+    //Trigger
+  pulling.activationStage    = logic_pulling;
+  releasing.activationStage  = logic_releasing;
+
+    //Hammer
+  cocking.activationStage    = logic_cocking;
+  engaging.activationStage   = logic_engaging;
+
+    //Bolt
+  closing.activationStage    = logic_closing;
   feeding.activationStage    = logic_feeding;
   chambing.activationStage   = logic_chambing;
   extracting.activationStage = logic_extracting;
   ejecting.activationStage   = logic_ejecting;
+  opening.activationStage    = logic_opening;
 
 //////////////////////////////
 //Assign weaponStage to weaponComponent
 
+    //Trigger
+  trigger_act.weaponStages.push_back(pulling);
+  trigger_rdy.weaponStages.push_back(releasing);
+
+    //Hammer
+  hammer_act.weaponStages.push_back(cocking);
+  hammer_rdy.weaponStages.push_back(engaging);
+
+    //Bolt
   bolt_act.weaponStages.push_back(feeding);
   bolt_act.weaponStages.push_back(chambing);
-  //bolt_act.weaponStages.push_back(closing); //UNUSED
+  bolt_act.weaponStages.push_back(closing);
   bolt_rdy.weaponStages.push_back(extracting);
   bolt_rdy.weaponStages.push_back(ejecting);
-  //bolt_rdy.weaponStages.push_back(opening); //UNUSED
+  bolt_rdy.weaponStages.push_back(opening);
 
 //////////////////////////////
 //Weapon Systems
@@ -518,18 +626,6 @@ int main()
 
 //////////////////////////////
 //Assign weaponComponent to weaponSystem
-
-  enum WEAP_COMPS_ENUMS
-  {
-    TRIGGER,
-    ACTION,
-    HAMMER,
-    FEEDPORT,
-    BOLT,
-    CHAMBER,
-    BARREL,
-    MUZZLE
-  };
 
   rifleAuto.weapComps.push_back(trigger);
   rifleAuto.weapComps.push_back(action);
@@ -553,17 +649,17 @@ int main()
     if(input == "t") //Check Mag
     {
       std::cout << "Ammo check:" << std::endl;
-      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine == nullptr)
+      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount == 0)
+      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount == 0)
       {
         std::cout << "*Magizine EMPTY" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount > 0)
+      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount > 0)
       {
-        std::cout << "*" << reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount;
+        std::cout << "*" << reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount;
         std::cout << " Rounds in Magizine" << std::endl;
       }
     }
@@ -574,7 +670,7 @@ int main()
       bool shouldReload = true;
 
         //If weapon already has magizine
-      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine != nullptr)
+      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine != nullptr)
       {
         if(detactableMagizine->roundCount == defaultRoundCount)
         {
@@ -584,7 +680,7 @@ int main()
         else
         {
           std::cout << "*Releasing Magizine" << std::endl;
-          reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine = nullptr;
+          reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = nullptr;
         }
       }
 
@@ -592,7 +688,7 @@ int main()
       {
         std::cout << "Inserting Magizine" << std::endl;
         detactableMagizine->roundCount = defaultRoundCount;
-        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine = detactableMagizine;
+        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = detactableMagizine;
       }
     }
     else if(input == "f") //Fire Weapon
@@ -601,8 +697,6 @@ int main()
     }
 #endif
   }
-
-  delete detactableMagizine;
 
   return 0;
 }
