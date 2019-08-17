@@ -365,7 +365,7 @@ struct weaponSystem
   //void activateComponent(states, std::string); //UNUSED
 
     //TODO: Change to std::vector<weaponComponent*>
-  std::vector<weaponComponent> weapComps;
+  std::vector<weaponComponent*> weapComps;
 };
 
 #if 1
@@ -449,19 +449,19 @@ int main()
 //Weapon Components
 
   //Pre-fire
-  weaponComponent trigger;
-  weaponComponent action;
-  weaponComponent hammer;
+  weaponComponent *trigger  = new weaponComponent;
+  weaponComponent *action   = new weaponComponent;
+  weaponComponent *hammer   = new weaponComponent;
 
   //Firing
-  weapComp_Port   feedPort;
-  weapComp_Round  bolt/*(chamber)*/;
-  weapComp_Round  chamber/*(bolt)*/;
+  weapComp_Port   *feedPort = new weapComp_Port;
+  weapComp_Round  *bolt     = new weapComp_Round;
+  weapComp_Round  *chamber  = new weapComp_Round;
   //weaponComponent ejectionPort; //UNUSED
 
   //Post-fire
-  weaponComponent barrel;
-  weaponComponent muzzle;
+  weaponComponent *barrel   = new weaponComponent;
+  weaponComponent *muzzle   = new weaponComponent;
 
   //External Components
   ws_magizine* detactableMagizine = new ws_magizine;
@@ -549,26 +549,21 @@ int main()
     std::cout << "\nENTER COMMAND" << std::endl;
     std::cin >> input;
 
-    if(curWeapon.weapComps[FEEDPORT].magizine == nullptr)
-    {
-      std::cout << "*No Magizine" << std::endl;
-    }
-
-#if 0
+#if 1
     if(input == "t") //Check Mag
     {
       std::cout << "Ammo check:" << std::endl;
-      if(curWeapon.weapComps[FEEDPORT].magizine == nullptr)
+      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
       }
-      else if(curWeapon.weapComps[FEEDPORT].magizine->roundCount == 0)
+      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount == 0)
       {
         std::cout << "*Magizine EMPTY" << std::endl;
       }
-      else if(curWeapon.weapComps[FEEDPORT].magizine->roundCount > 0)
+      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount > 0)
       {
-        std::cout << "*" << curWeapon.weapComps[FEEDPORT].magizine->roundCount;
+        std::cout << "*" << reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine->roundCount;
         std::cout << " Rounds in Magizine" << std::endl;
       }
     }
@@ -576,28 +571,33 @@ int main()
     {
       std::cout << "Reloading:" << std::endl;
 
-      bool shouldReload = false;
+      bool shouldReload = true;
 
         //If weapon already has magizine
-      if(curWeapon.weapComps[FEEDPORT].magizine != nullptr)
+      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine != nullptr)
       {
         if(detactableMagizine->roundCount == defaultRoundCount)
         {
           std::cout << "*Magizine FULL" << std::endl;
+          shouldReload = false;
         }
         else
         {
           std::cout << "*Releasing Magizine" << std::endl;
-          curWeapon.weapComps[FEEDPORT].magizine = nullptr;
-          shouldReload = true;
+          reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine = nullptr;
         }
       }
 
       if(shouldReload == true)
       {
+        std::cout << "Inserting Magizine" << std::endl;
         detactableMagizine->roundCount = defaultRoundCount;
-        curWeapon.weapComps[FEEDPORT].magizine = detactableMagizine;
+        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[FEEDPORT])->magizine = detactableMagizine;
       }
+    }
+    else if(input == "f") //Fire Weapon
+    {
+      
     }
 #endif
   }
