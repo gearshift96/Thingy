@@ -29,9 +29,10 @@ static const unsigned defaultRoundCount = 10;
 ////////////////////////////////////////
 //Opening:
 
-void logic_opening()
+bool logic_opening()
 {
   std::cout << "Opening" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
@@ -39,7 +40,7 @@ void logic_opening()
 //  -bolt beginning to close (animation + sound)
 //  -transitionRoundFromMagToBolt (transfer of object)
 
-void logic_feeding()
+bool logic_feeding()
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
@@ -52,6 +53,7 @@ void logic_feeding()
 */
 
   std::cout << "Feeding" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
@@ -59,7 +61,7 @@ void logic_feeding()
 //  -bolt finsihing to close (animation + sound)
 //  -transitionRoundFromBoltToChamber (transfer of object)
 
-void logic_chambing()
+bool logic_chambing()
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosChambering);
@@ -72,6 +74,7 @@ void logic_chambing()
 */
 
   std::cout << "Chambing" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
@@ -113,7 +116,7 @@ void logic_chambing()
 //  -if successful: continue
 //  -else: don't continue
 
-void logic_firing()
+bool logic_firing()
 {
 /*
   playAnimation(HammerPos<animation>(hammerPosEngaged));
@@ -127,6 +130,7 @@ void logic_firing()
 */
 
   std::cout << "Firing" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
@@ -146,7 +150,7 @@ void logic_firing()
 //Extracting:
 //  -transitionRound(Remains)FromChamberToBolt (transfer of object)
 
-void logic_extracting()
+bool logic_extracting()
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
@@ -159,13 +163,14 @@ void logic_extracting()
 */
 
   std::cout << "Extracting" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //Ejecting:
 //  -ejectRoundFromBolt (sound + particle effects + spawning object)
 
-void logic_ejecting()
+bool logic_ejecting()
 {
 /*
   playSound(firearm.ejectionSound);
@@ -177,21 +182,23 @@ void logic_ejecting()
 */
 
   std::cout << "Ejecting" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //Closing
 
-void logic_closing()
+bool logic_closing()
 {
   std::cout << "Closing" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //*Cocking
 //  -ready hammer (animation + sound)
 
-void logic_cocking()
+bool logic_cocking()
 {
 /*
   playAnimation(HammerPos<animation>(hammerPosFullCock));
@@ -201,31 +208,35 @@ void logic_cocking()
 */
 
   std::cout << "Cocking" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //*Engaging
 //  -engage hammer (animation + sound)
 
-void logic_engaging()
+bool logic_engaging()
 {
   std::cout << "Engaging" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //Pulling
 
-void logic_pulling()
+bool logic_pulling()
 {
   std::cout << "Pulling" << std::endl;
+  return true;
 }
 
 ////////////////////////////////////////
 //Releasing
 
-void logic_releasing()
+bool logic_releasing()
 {
   std::cout << "Releasing" << std::endl;
+  return true;
 }
 
 #endif
@@ -325,7 +336,7 @@ void WS_deserialize(string scriptName)
 
   while(obj.getNextObj() != nullptr)
   {
-    ti.push_back(SetweaponStage(obj.curObj());
+    ti.push_back(SetweaponStage(obj.curObj()));
   }
 }
 
@@ -336,17 +347,22 @@ void WS_deserialize(string scriptName)
 
 enum triggerDirection //: int
 {
-  fromAscending,
-  fromDecending,
-  fromBoth
+  TD_ACTIVATE, //fromAscending,
+  TD_READY,    //fromDecending,
+  //TD_BOTH,    //fromBoth
 };
 
 struct weaponStage
 {
+  weaponStage(triggerDirection trigDirection_) : trigDirection(trigDirection_)
+  {
+  }
+
   //std::string name;         //UNUSED
   //float triggerPos;         //UNUSED //value from 0.0f to 1.0f
   //float rateOfChangeFactor; //UNUSED //rate at which to APPROACH this stage
-  void (*activationStage)();  //function pointer
+  triggerDirection trigDirection;
+  bool (*activationStage)();  //function pointer
   //SCRIPT activateStage;     //UNUSED
 
     // changeInPos / time(seconds)
@@ -354,25 +370,6 @@ struct weaponStage
 
     // seconds to get to newPos; (newPos - curPos) / time[in seconds]
   //void rateOfPosChangeRelative(float); //UNUSED
-};
-
-struct weaponState
-{
-  std::vector<weaponStage> weaponStages; //sorted array using 'triggerPos' as key
-  //unsigned curStage = 0;
-
-    //function pointer; activates all weaponStages
-  void activateState()
-  {
-    for(unsigned i = 0; i < weaponStages.size(); ++i)
-    {
-      weaponStages[i].activationStage();
-    }
-  }
-
-  void readyState()
-  {
-  }
 };
 
 //can be affected externally from system or by other weapon components
@@ -385,8 +382,69 @@ struct weaponComponent
 
   //void activateComponent(float); //value to set for curPos //DEPRECATED
 
-  weaponState activate;
-  weaponState ready;
+  std::vector<weaponStage> weaponStages; //sorted array using 'triggerPos' as key
+  unsigned curStage = 0;
+
+    //function pointer; activates all weaponStages
+  void activateState()
+  {
+    while(curStage < weaponStages.size())
+    {
+      if(
+         weaponStages[curStage].trigDirection == TD_ACTIVATE
+         //|| weaponStages[curStage].trigDirection == TD_BOTH
+        )
+      {
+        if(weaponStages[curStage].activationStage())
+        {
+          ++curStage;
+        }
+        else
+        {
+          break;
+        }
+      }
+      else
+      {
+        ++curStage;
+      }
+    }
+  }
+
+  void readyState()
+  {
+    while(curStage > 0)
+    {
+      if(
+         weaponStages[curStage].trigDirection == TD_READY
+         //|| weaponStages[curStage].trigDirection == TD_BOTH
+        )
+      {
+        if(weaponStages[curStage].activationStage())
+        {
+          --curStage;
+        }
+        else
+        {
+          break;
+        }
+      }
+      else
+      {
+        --curStage;
+      }
+    }
+  }
+
+  bool IsReady()
+  {
+    return curStage == 0;
+  }
+
+  bool IsActive()
+  {
+    return curStage == weaponStages.size();
+  }
 };
 
 struct weaponSystem
@@ -546,47 +604,30 @@ int main()
   ws_magizine* detactableMagizine = new ws_magizine;
 
 //////////////////////////////
-//Weapon States
-
-  weaponState trigger_act;
-  //weaponState action_act; //UNUSED
-  weaponState hammer_act;
-  weaponState bolt_act;
-  //weaponState chamber_act; //UNUSED
-
-  //weaponState chamber_rdy; //UNUSED
-  weaponState bolt_rdy;
-  weaponState hammer_rdy;
-  //weaponState action_rdy; //UNUSED
-  weaponState trigger_rdy;
-
-  //trigger.activationStage = ;
-
-//////////////////////////////
 //Weapon Stages
 
     //Trigger
-  weaponStage pulling;
-  weaponStage releasing;
+  weaponStage releasing(TD_READY);
+  weaponStage pulling(TD_ACTIVATE);
 
     //Hammer
-  weaponStage cocking;
-  weaponStage engaging;
+  weaponStage cocking(TD_READY);
+  weaponStage engaging(TD_ACTIVATE);
 
     //Bolt
-  weaponStage feeding;
-  weaponStage chambing;
-  weaponStage closing;
-  weaponStage extracting;
-  weaponStage ejecting;
-  weaponStage opening;
+  weaponStage feeding(TD_ACTIVATE);
+  weaponStage chambing(TD_ACTIVATE);
+  weaponStage closing(TD_ACTIVATE);
+  weaponStage extracting(TD_READY);
+  weaponStage ejecting(TD_READY);
+  weaponStage opening(TD_READY);
 
 //////////////////////////////
 //Assign activationStage to weaponStage
 
     //Trigger
-  pulling.activationStage    = logic_pulling;
   releasing.activationStage  = logic_releasing;
+  pulling.activationStage    = logic_pulling;
 
     //Hammer
   cocking.activationStage    = logic_cocking;
@@ -604,20 +645,20 @@ int main()
 //Assign weaponStage to weaponComponent
 
     //Trigger
-  trigger_act.weaponStages.push_back(pulling);
-  trigger_rdy.weaponStages.push_back(releasing);
+  trigger->weaponStages.push_back(pulling);
+  trigger->weaponStages.push_back(releasing);
 
     //Hammer
-  hammer_act.weaponStages.push_back(cocking);
-  hammer_rdy.weaponStages.push_back(engaging);
+  hammer->weaponStages.push_back(cocking);
+  hammer->weaponStages.push_back(engaging);
 
     //Bolt
-  bolt_act.weaponStages.push_back(feeding);
-  bolt_act.weaponStages.push_back(chambing);
-  bolt_act.weaponStages.push_back(closing);
-  bolt_rdy.weaponStages.push_back(extracting);
-  bolt_rdy.weaponStages.push_back(ejecting);
-  bolt_rdy.weaponStages.push_back(opening);
+  bolt->weaponStages.push_back(opening);
+  bolt->weaponStages.push_back(feeding);
+  bolt->weaponStages.push_back(extracting);
+  bolt->weaponStages.push_back(chambing);
+  bolt->weaponStages.push_back(ejecting);
+  bolt->weaponStages.push_back(closing);
 
 //////////////////////////////
 //Weapon Systems
@@ -627,6 +668,7 @@ int main()
 //////////////////////////////
 //Assign weaponComponent to weaponSystem
 
+    //NOTE: Needs to be in order of enum WEAP_COMPS_ENUMS
   rifleAuto.weapComps.push_back(trigger);
   rifleAuto.weapComps.push_back(action);
   rifleAuto.weapComps.push_back(hammer);
@@ -693,7 +735,24 @@ int main()
     }
     else if(input == "f") //Fire Weapon
     {
-      
+      std::cout << "Firing:" << std::endl;
+
+      curWeapon.weapComps[weaponSystem::TRIGGER]->activateState();
+
+      if(curWeapon.weapComps[weaponSystem::TRIGGER]->IsActive())
+      {
+        curWeapon.weapComps[weaponSystem::HAMMER]->activateState();
+
+        if(curWeapon.weapComps[weaponSystem::HAMMER]->IsActive())
+        {
+          curWeapon.weapComps[weaponSystem::BOLT]->activateState();
+
+          if(curWeapon.weapComps[weaponSystem::BOLT]->IsActive())
+          {
+            //activate round in chamber; this will need to be done in activateStage
+          }
+        }
+      }
     }
 #endif
   }
