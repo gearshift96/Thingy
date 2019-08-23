@@ -113,9 +113,9 @@ void WS_deserialize(string scriptName)
 
 enum triggerDirection //: int
 {
-  TD_ACTIVATE, //fromAscending,
+  TD_ACTIVE, //fromAscending,
   TD_READY,    //fromDecending,
-  //TD_BOTH,    //fromBoth
+  //TD_EITHER,    //fromBoth
 };
 
 struct weaponStage
@@ -128,7 +128,7 @@ struct weaponStage
   //float rateOfChangeFactor; //UNUSED //rate at which to APPROACH this stage
   triggerDirection trigDirection;
   bool (*activationStage)(struct weaponComponent* thisComp);  //function pointer
-  //SCRIPT activateStage;     //UNUSED
+  unsigned rateOfFire;
 
     // changeInPos / time(seconds)
   //void rateOfPosChangeFixed(float);    //UNUSED
@@ -173,8 +173,8 @@ struct weaponComponent
     while(curStage < weaponStages.size())
     {
       if(
-         weaponStages[curStage].trigDirection == TD_ACTIVATE
-         //|| weaponStages[curStage].trigDirection == TD_BOTH
+         weaponStages[curStage].trigDirection == TD_ACTIVE
+         //|| weaponStages[curStage].trigDirection == TD_EITHER
         )
       {
         if(weaponStages[curStage].activationStage(this))
@@ -210,7 +210,7 @@ struct weaponComponent
     {
       if(
          weaponStages[curStage].trigDirection == TD_READY
-         //|| weaponStages[curStage].trigDirection == TD_BOTH
+         //|| weaponStages[curStage].trigDirection == TD_EITHER
         )
       {
         if(weaponStages[curStage].activationStage(this))
@@ -230,6 +230,55 @@ struct weaponComponent
   }
 };
 
+struct weaponAction : public weaponComponent
+{
+  unsigned roundsPerPull; //0 implies full auto //<-??
+  bool triggerCheck; //to check if trigger is activie before continuing on sequence
+  bool resetOnTriggerPull; //if(remainingRoundsPerPull == 0){/*reset anyway*/}
+
+  //semi
+    //1
+    //false/true  (same difference)
+    //true /false (same difference)
+
+  //full
+    //0
+    //true /false (false means to keep firing until ammo in system is exhausted)
+    //true /false (same difference)
+
+  //burst (3-round) w/ triggerCheck w/ resetOnTriggerPull
+    //3
+    //true
+    //true
+  //mode that does not need to complete burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/ triggerCheck w/o resetOnTriggerPull
+    //3
+    //true
+    //false
+  //mode that does not need to complete burst
+  //BUT will have less rounds on next trigger pull if not completed
+
+  //burst (3-round) w/o triggerCheck w/ resetOnTriggerPull
+    //3
+    //false
+    //true
+  //mode that will complete all rounds in burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/o triggerCheck w/o resetOnTriggerPull*
+    //3
+    //false
+    //false
+  //mode that will complete all rounds in burst
+  //BUT will have less rounds on next trigger pull if not completed
+  //*needs to still be considered in case a full burst could not be performed
+  //(i.e. reload needed mid-burst)
+
+  unsigned remainingRoundsPerPull; //once reached 0, end sequence
+};
+
 struct weaponSystem
 {
 /* //UNUSED
@@ -245,6 +294,7 @@ struct weaponSystem
   {
     TRIGGER,
     HAMMER,
+    //ACTION,
     FEEDPORT,
     BOLT,
     CHAMBER,
@@ -643,48 +693,80 @@ int main()
 //Weapon Components
 
   //Pre-fire
-  weaponComponent *trigger  = new weaponComponent;
-  weaponComponent *hammer   = new weaponComponent;
+  weaponComponent *trigger   = new weaponComponent;
+  weaponComponent *hammer    = new weaponComponent;
+  //weaponComponent *action    = new weaponComponent;
 
   //Firing
-  weapComp_Port   *feedPort = new weapComp_Port;
-  weapComp_Round  *bolt     = new weapComp_Round;
-  weapComp_Round  *chamber  = new weapComp_Round;
-  //weaponComponent ejectionPort; //UNUSED
+  weapComp_Port   *feedPort  = new weapComp_Port;
+  weapComp_Round  *bolt      = new weapComp_Round;
+  weapComp_Round  *chamber   = new weapComp_Round;
+  weaponComponent *ejectPort = new weaponComponent;
 
   //Post-fire
-  weaponComponent *barrel   = new weaponComponent;
-  weaponComponent *muzzle   = new weaponComponent;
+  weaponComponent *barrel    = new weaponComponent;
+  weaponComponent *muzzle    = new weaponComponent;
 
   //External Components
-  ws_magizine* detactableMagizine = new ws_magizine;
+  ws_magizine* detactableMag = new ws_magizine;
 
   trigger->CompToActivate(hammer);
   hammer->CompToActivate(bolt);
   bolt->CompToActivate(chamber);
 
+#if 0
+  //CompToActivate(component to activate, state component needs to be in for use)
+
+    //Opened-bolt rifle
+  trigger->CompToActivate(bolt, TD_READY);
+  //action->CompToActivate(bolt, TD_READY); //?
+  //***No hammer
+  bolt->CompToActivate(chamber, TD_EITHER);
+
+  chamber->CompToReady(bolt, TD_ACTIVE);
+  //bolt->CompToReady(action, TD_EITHER); //?
+
+    //Closed-bolt rifle
+  trigger->CompToActivate(hammer, TD_READY);
+  hammer->CompToActivate(bolt, TD_ACTIVE);
+  bolt->CompToActivate(chamber, TD_EITHER);
+
+  chamber->CompToReady(bolt, TD_ACTIVE);
+  bolt->CompToReady(hammer, TD_EITHER);
+
+    //Semi-auto Pistol; bolt is slide
+  trigger->CompToActivate(hammer, TD_EITHER);
+  hammer->CompToActivate(bolt, TD_ACTIVE);
+
+  chamber->CompToReady(bolt, TD_ACTIVE);
+  bolt->CompToReady(hammer, TD_EITHER);
+
+#endif
+
 //////////////////////////////
 //Weapon Stages
 
-    //Trigger
+    //Trigger: ready when released
   weaponStage releasing(TD_READY);
-  weaponStage pulling(TD_ACTIVATE);
+  weaponStage pulling(TD_ACTIVE);
 
-    //Hammer
+    //Hammer: ready when cocked
   weaponStage cocking(TD_READY);
-  weaponStage engaging(TD_ACTIVATE);
+  weaponStage engaging(TD_ACTIVE);
 
-    //Bolt
-  weaponStage feeding(TD_ACTIVATE);
-  weaponStage chambing(TD_ACTIVATE);
-  weaponStage closing(TD_ACTIVATE);
-  weaponStage extracting(TD_READY);
-  weaponStage ejecting(TD_READY);
+    //Bolt: ready when opened
   weaponStage opening(TD_READY);
+  weaponStage ejecting(TD_READY);
+  weaponStage extracting(TD_READY);
+  weaponStage feeding(TD_ACTIVE);
+  weaponStage closing(TD_ACTIVE);
 
-    //Chambering
-  weaponStage filling(TD_ACTIVATE);
+    //Chamber: ready when emptied
   weaponStage emptying(TD_READY);
+  weaponStage chambing(TD_ACTIVE); //take round from BOLT
+
+    //Round
+  //weaponStage firing(TD_ACTIVE);
 
 //////////////////////////////
 //Assign activationStage to weaponStage
@@ -698,14 +780,15 @@ int main()
   engaging.activationStage   = logic_engaging;
 
     //Bolt
-  closing.activationStage    = logic_closing;
-  feeding.activationStage    = logic_feeding;
-  chambing.activationStage   = logic_chambing;
-  extracting.activationStage = logic_extracting;
-  ejecting.activationStage   = logic_ejecting;
   opening.activationStage    = logic_opening;
+  ejecting.activationStage   = logic_ejecting;
+  extracting.activationStage = logic_extracting;
+  feeding.activationStage    = logic_feeding;
+  closing.activationStage    = logic_closing;
 
     //Chamber
+  chambing.activationStage   = logic_chambing;
+  firing.activationStage     = logic_firing;
 
 //////////////////////////////
 //Assign weaponStage to weaponComponent
@@ -720,15 +803,14 @@ int main()
 
     //Bolt
   bolt->weaponStages.push_back(opening);
-  bolt->weaponStages.push_back(feeding);
-  bolt->weaponStages.push_back(extracting);
-  bolt->weaponStages.push_back(chambing);
   bolt->weaponStages.push_back(ejecting);
+  bolt->weaponStages.push_back(extracting);
+  bolt->weaponStages.push_back(feeding);
   bolt->weaponStages.push_back(closing);
 
-    //Chambering
-  chamber->weaponStages.push_back(filling);
-  chamber->weaponStages.push_back(emptying);
+    //Chamber
+  chamber->weaponStages.push_back(chambing);
+  chamber->weaponStages.push_back(firing);
 
 //////////////////////////////
 //Weapon Systems
@@ -741,6 +823,7 @@ int main()
     //NOTE: Needs to be in order of enum WEAP_COMPS_ENUMS
   rifleAuto.weapComps.push_back(trigger);
   rifleAuto.weapComps.push_back(hammer);
+  //rifleAuto.weapComps.push_back(action);
   rifleAuto.weapComps.push_back(feedPort);
   rifleAuto.weapComps.push_back(bolt);
   rifleAuto.weapComps.push_back(chamber);
@@ -783,7 +866,7 @@ int main()
         //If weapon already has magizine
       if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine != nullptr)
       {
-        if(detactableMagizine->roundCount == defaultRoundCount)
+        if(detactableMag->roundCount == defaultRoundCount)
         {
           std::cout << "*Magizine FULL" << std::endl;
           shouldReload = false;
@@ -797,9 +880,9 @@ int main()
 
       if(shouldReload == true)
       {
-        std::cout << "Inserting Magizine" << std::endl;
-        detactableMagizine->roundCount = defaultRoundCount;
-        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = detactableMagizine;
+        std::cout << "*Inserting Magizine" << std::endl;
+        detactableMag->roundCount = defaultRoundCount;
+        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = detactableMag;
       }
     }
     else if(input == "f") //Fire Weapon
