@@ -115,7 +115,7 @@ enum triggerDirection //: int
 {
   TD_ACTIVE, //fromAscending,
   TD_READY,    //fromDecending,
-  //TD_EITHER,    //fromBoth
+  TD_EITHER,    //fromBoth
 };
 
 struct weaponStage
@@ -150,11 +150,24 @@ struct weaponComponent
   std::vector<weaponStage> weaponStages; //sorted array using 'triggerPos' as key
   unsigned curStage = 0;
 
-  weaponComponent* compToActivate = nullptr;
+  weaponComponent* compToActivate      = nullptr;
+  triggerDirection conditionToActivate = TD_EITHER;
 
-  void CompToActivate(weaponComponent* compToActivate_)
+  weaponComponent* compToReady      = nullptr;
+  triggerDirection conditionToReady = TD_EITHER;
+
+  void CompToActivate(weaponComponent* compToActivate_,
+                      triggerDirection trigDirCondition)
   {
-    compToActivate = compToActivate_;
+    compToActivate      = compToActivate_;
+    conditionToActivate = trigDirCondition;
+  }
+
+  void CompToReady(weaponComponent* compToReady_,
+                   triggerDirection trigDirCondition)
+  {
+    compToReady      = compToReady_;
+    conditionToReady = trigDirCondition;
   }
 
   bool IsReady()
@@ -167,7 +180,7 @@ struct weaponComponent
     return curStage == weaponStages.size();
   }
 
-    //function pointer; activates all weaponStages
+    //function pointer; activates all active weaponStages
   void activateComponent()
   {
     while(curStage < weaponStages.size())
@@ -196,7 +209,11 @@ struct weaponComponent
     {
       if(compToActivate != nullptr)
       {
-        if(compToActivate->IsReady())
+        if(
+           conditionToActivate == TD_EITHER
+           || (conditionToActivate == TD_READY  && compToActivate->IsReady())
+           || (conditionToActivate == TD_ACTIVE && compToActivate->IsActive())
+          )
         {
           compToActivate->activateComponent();
         }
@@ -204,7 +221,7 @@ struct weaponComponent
     }
   }
 
-  void readyState()
+  void readyComponent()
   {
     while(curStage > 0)
     {
@@ -227,9 +244,25 @@ struct weaponComponent
         --curStage;
       }
     }
+
+    if(IsReady())
+    {
+      if(compToReady != nullptr)
+      {
+        if(
+           conditionToActivate == TD_EITHER
+           || (conditionToActivate == TD_READY  && compToReady->IsReady())
+           || (conditionToActivate == TD_ACTIVE && compToReady->IsActive())
+          )
+        {
+          compToReady->activateComponent();
+        }
+      }
+    }
   }
 };
 
+//Each weaponStage of the weaponComponent serves as a firemode
 struct weaponAction : public weaponComponent
 {
   unsigned roundsPerPull; //0 implies full auto //<-??
@@ -277,6 +310,10 @@ struct weaponAction : public weaponComponent
   //(i.e. reload needed mid-burst)
 
   unsigned remainingRoundsPerPull; //once reached 0, end sequence
+
+  void activateComponent()
+  {
+  }
 };
 
 struct weaponSystem
@@ -294,7 +331,7 @@ struct weaponSystem
   {
     TRIGGER,
     HAMMER,
-    //ACTION,
+    ACTION,
     FEEDPORT,
     BOLT,
     CHAMBER,
@@ -316,10 +353,25 @@ struct ws_projectile
 
 struct ws_round
 {
+  //ws_propellant *propellant;
   ws_projectile *projectile;
-  void activateRound();
+
+  bool activateRound()
+  {
+    if(projectile != nullptr)
+    {
+      std::cout << "ActivatingRound" << std::endl;
+      delete projectile;
+      projectile = nullptr;
+
+      return true;
+    }
+
+    return false;
+  }
 };
 
+//Weapon Component that can contain a ws_round(s)
 struct weapComp_Round : public weaponComponent
 {
   ws_round* round = nullptr;
@@ -339,6 +391,9 @@ struct weapComp_Round : public weaponComponent
       if(dest->round == nullptr)
       {
         std::cout << "Transfering round to destination" << std::endl;
+
+        //USE std::move
+        delete dest->round;
         dest->round = round;
         round = nullptr;
       }
@@ -382,7 +437,6 @@ struct ws_magizine : public weapComp_Round
       std::cout << "Round already ready" << std::endl;
     }
   }
-  //std::vector<ws_round> rounds; //UNUSED
 };
 
 struct weapComp_Port : public weaponComponent
@@ -500,6 +554,16 @@ bool logic_feeding(struct weaponComponent* /* thisComp */)
 }
 
 ////////////////////////////////////////
+//Emptying:
+
+bool logic_emptying(struct weaponComponent* /* thisComp */)
+{
+  std::cout << "Emptying" << std::endl;
+
+  return true;
+}
+
+////////////////////////////////////////
 //Chambering:
 //  -bolt finsihing to close (animation + sound)
 //  -transitionRoundFromBoltToChamber (transfer of object)
@@ -517,6 +581,7 @@ bool logic_chambing(struct weaponComponent* /* thisComp */)
 */
 
   std::cout << "Chambing" << std::endl;
+
   return true;
 }
 
@@ -559,7 +624,7 @@ bool logic_chambing(struct weaponComponent* /* thisComp */)
 //  -if successful: continue
 //  -else: don't continue
 
-bool logic_firing(struct weaponComponent* /* thisComp */)
+bool logic_firing(struct weaponComponent* thisComp)
 {
 /*
   playAnimation(HammerPos<animation>(hammerPosEngaged));
@@ -573,7 +638,10 @@ bool logic_firing(struct weaponComponent* /* thisComp */)
 */
 
   std::cout << "Firing" << std::endl;
-  return true;
+
+  bool returnVale = reinterpret_cast<weapComp_Round*>(thisComp)->round->activateRound();
+
+  return returnVale;
 }
 
 ////////////////////////////////////////
@@ -695,13 +763,16 @@ int main()
   //Pre-fire
   weaponComponent *trigger   = new weaponComponent;
   weaponComponent *hammer    = new weaponComponent;
-  //weaponComponent *action    = new weaponComponent;
+  weaponAction    *action    = new weaponAction;
 
   //Firing
   weapComp_Port   *feedPort  = new weapComp_Port;
   weapComp_Round  *bolt      = new weapComp_Round;
   weapComp_Round  *chamber   = new weapComp_Round;
   weaponComponent *ejectPort = new weaponComponent;
+
+  delete ejectPort;
+  ejectPort = nullptr;
 
   //Post-fire
   weaponComponent *barrel    = new weaponComponent;
@@ -710,29 +781,37 @@ int main()
   //External Components
   ws_magizine* detactableMag = new ws_magizine;
 
+#if 0
   trigger->CompToActivate(hammer);
   hammer->CompToActivate(bolt);
   bolt->CompToActivate(chamber);
 
-#if 0
+#else
   //CompToActivate(component to activate, state component needs to be in for use)
 
+#if 0
     //Opened-bolt rifle
-  trigger->CompToActivate(bolt, TD_READY);
-  //action->CompToActivate(bolt, TD_READY); //?
+  trigger->CompToActivate(action, TD_READY);
+  action->CompToActivate(bolt, TD_READY);
   //***No hammer
   bolt->CompToActivate(chamber, TD_EITHER);
 
   chamber->CompToReady(bolt, TD_ACTIVE);
-  //bolt->CompToReady(action, TD_EITHER); //?
+  bolt->CompToReady(action, TD_EITHER);
+
+#elif 1
 
     //Closed-bolt rifle
-  trigger->CompToActivate(hammer, TD_READY);
+  trigger->CompToActivate(action, TD_READY);
+  action->CompToActivate(hammer, TD_READY);
   hammer->CompToActivate(bolt, TD_ACTIVE);
   bolt->CompToActivate(chamber, TD_EITHER);
 
   chamber->CompToReady(bolt, TD_ACTIVE);
   bolt->CompToReady(hammer, TD_EITHER);
+  hammer->CompToReady(action, TD_EITHER);
+
+#else
 
     //Semi-auto Pistol; bolt is slide
   trigger->CompToActivate(hammer, TD_EITHER);
@@ -740,6 +819,8 @@ int main()
 
   chamber->CompToReady(bolt, TD_ACTIVE);
   bolt->CompToReady(hammer, TD_EITHER);
+
+#endif
 
 #endif
 
@@ -766,7 +847,7 @@ int main()
   weaponStage chambing(TD_ACTIVE); //take round from BOLT
 
     //Round
-  //weaponStage firing(TD_ACTIVE);
+  weaponStage firing(TD_ACTIVE);
 
 //////////////////////////////
 //Assign activationStage to weaponStage
@@ -787,6 +868,7 @@ int main()
   closing.activationStage    = logic_closing;
 
     //Chamber
+  emptying.activationStage   = logic_emptying;
   chambing.activationStage   = logic_chambing;
   firing.activationStage     = logic_firing;
 
@@ -823,7 +905,7 @@ int main()
     //NOTE: Needs to be in order of enum WEAP_COMPS_ENUMS
   rifleAuto.weapComps.push_back(trigger);
   rifleAuto.weapComps.push_back(hammer);
-  //rifleAuto.weapComps.push_back(action);
+  rifleAuto.weapComps.push_back(action);
   rifleAuto.weapComps.push_back(feedPort);
   rifleAuto.weapComps.push_back(bolt);
   rifleAuto.weapComps.push_back(chamber);
