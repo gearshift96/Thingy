@@ -140,6 +140,7 @@ struct weaponStage
 //can be affected externally from system or by other weapon components
 struct weaponComponent
 {
+  struct weaponSystem* parent = nullptr;
   //std::string name;                  //UNUSED
   //float curPos;                      //UNUSED
   //float curRateOfChange;             //UNUSED
@@ -181,7 +182,7 @@ struct weaponComponent
   }
 
     //function pointer; activates all active weaponStages
-  void activateComponent()
+  virtual void activateComponent(bool overrideCheck = false)
   {
     while(curStage < weaponStages.size())
     {
@@ -209,6 +210,7 @@ struct weaponComponent
     {
       if(compToActivate != nullptr)
       {
+if(overrideCheck == false)
         if(
            conditionToActivate == TD_EITHER
            || (conditionToActivate == TD_READY  && compToActivate->IsReady())
@@ -221,7 +223,7 @@ struct weaponComponent
     }
   }
 
-  void readyComponent()
+  void readyComponent(bool overrideCheck = false)
   {
     while(curStage > 0)
     {
@@ -249,6 +251,7 @@ struct weaponComponent
     {
       if(compToReady != nullptr)
       {
+if(overrideCheck == false)
         if(
            conditionToActivate == TD_EITHER
            || (conditionToActivate == TD_READY  && compToReady->IsReady())
@@ -262,58 +265,22 @@ struct weaponComponent
   }
 };
 
-//Each weaponStage of the weaponComponent serves as a firemode
-struct weaponAction : public weaponComponent
+struct FireMode
 {
   unsigned roundsPerPull; //0 implies full auto //<-??
   bool triggerCheck; //to check if trigger is activie before continuing on sequence
   bool resetOnTriggerPull; //if(remainingRoundsPerPull == 0){/*reset anyway*/}
+};
 
-  //semi
-    //1
-    //false/true  (same difference)
-    //true /false (same difference)
-
-  //full
-    //0
-    //true /false (false means to keep firing until ammo in system is exhausted)
-    //true /false (same difference)
-
-  //burst (3-round) w/ triggerCheck w/ resetOnTriggerPull
-    //3
-    //true
-    //true
-  //mode that does not need to complete burst
-  //AND is reseted for each trigger pull
-
-  //burst (3-round) w/ triggerCheck w/o resetOnTriggerPull
-    //3
-    //true
-    //false
-  //mode that does not need to complete burst
-  //BUT will have less rounds on next trigger pull if not completed
-
-  //burst (3-round) w/o triggerCheck w/ resetOnTriggerPull
-    //3
-    //false
-    //true
-  //mode that will complete all rounds in burst
-  //AND is reseted for each trigger pull
-
-  //burst (3-round) w/o triggerCheck w/o resetOnTriggerPull*
-    //3
-    //false
-    //false
-  //mode that will complete all rounds in burst
-  //BUT will have less rounds on next trigger pull if not completed
-  //*needs to still be considered in case a full burst could not be performed
-  //(i.e. reload needed mid-burst)
+//Each weaponStage of the weaponComponent contain their unique firemode
+//that will affect the firemode of the weaponAction
+struct weaponAction : public weaponComponent
+{
+  FireMode firemode;
 
   unsigned remainingRoundsPerPull; //once reached 0, end sequence
 
-  void activateComponent()
-  {
-  }
+  void activateComponent();
 };
 
 struct weaponSystem
@@ -344,7 +311,28 @@ struct weaponSystem
 
     //TODO: Change to std::vector<weaponComponent*>
   std::vector<weaponComponent*> weapComps;
+
+  void addWeapComp(weaponComponent* weapComp)
+  {
+    weapComps.push_back(weapComp);
+    weapComp->parent = this;
+  }
 };
+
+void weaponAction::activateComponent()
+{
+  std::cout << "Actioning" << std::endl;
+
+  if(firemode.triggerCheck)
+  {
+    if(parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
+    {
+      return;
+    }
+  }
+
+  //weaponComponent::activateComponent();
+}
 
 #if 1
 struct ws_projectile
@@ -735,9 +723,16 @@ bool logic_engaging(struct weaponComponent* /* thisComp */)
 ////////////////////////////////////////
 //Pulling
 
-bool logic_pulling(struct weaponComponent* /* thisComp */)
+bool logic_pulling(struct weaponComponent* thisComp)
 {
   std::cout << "Pulling" << std::endl;
+
+  if(reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerPull)
+  {
+    reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
+      = reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
+  }
+
   return true;
 }
 
@@ -747,6 +742,86 @@ bool logic_pulling(struct weaponComponent* /* thisComp */)
 bool logic_releasing(struct weaponComponent* /* thisComp */)
 {
   std::cout << "Releasing" << std::endl;
+  return true;
+}
+
+
+////////////////////////////////////////
+//Firemodes
+
+  //semi
+    //1
+    //false/true  (same difference)
+    //true /false (same difference)
+
+  //full
+    //0
+    //true /false (false means to keep firing until ammo in system is exhausted)
+    //true /false (same difference)
+
+  //burst (3-round) w/ triggerCheck w/ resetOnTriggerPull
+    //3
+    //true
+    //true
+  //mode that does not need to complete burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/ triggerCheck w/o resetOnTriggerPull
+    //3
+    //true
+    //false
+  //mode that does not need to complete burst
+  //BUT will have less rounds on next trigger pull if not completed
+
+  //burst (3-round) w/o triggerCheck w/ resetOnTriggerPull
+    //3
+    //false
+    //true
+  //mode that will complete all rounds in burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/o triggerCheck w/o resetOnTriggerPull*
+    //3
+    //false
+    //false
+  //mode that will complete all rounds in burst
+  //BUT will have less rounds on next trigger pull if not completed
+  //*needs to still be considered in case a full burst could not be performed
+  //(i.e. reload needed mid-burst)
+
+/*
+struct FireMode
+{
+  unsigned roundsPerPull;
+  bool triggerCheck;
+  bool resetOnTriggerPull;
+}
+*/
+
+bool firemode_semi(struct weaponComponent* thisComp)
+{
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 1;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = false;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+
+  return true;
+}
+
+bool firemode_burst3(struct weaponComponent* thisComp)
+{
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 3;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+
+  return true;
+}
+
+bool firemode_full(struct weaponComponent* thisComp)
+{
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 0;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
+  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+
   return true;
 }
 
@@ -769,10 +844,7 @@ int main()
   weapComp_Port   *feedPort  = new weapComp_Port;
   weapComp_Round  *bolt      = new weapComp_Round;
   weapComp_Round  *chamber   = new weapComp_Round;
-  weaponComponent *ejectPort = new weaponComponent;
-
-  delete ejectPort;
-  ejectPort = nullptr;
+  //weaponComponent *ejectPort = new weaponComponent; //UNUSED
 
   //Post-fire
   weaponComponent *barrel    = new weaponComponent;
@@ -811,6 +883,11 @@ int main()
   bolt->CompToReady(hammer, TD_EITHER);
   hammer->CompToReady(action, TD_EITHER);
 
+  //Make ready to fire
+  action->readyComponent(true);
+  hammer->readyComponent(true);
+  bolt->activateComponent(true);
+
 #else
 
     //Semi-auto Pistol; bolt is slide
@@ -834,6 +911,11 @@ int main()
     //Hammer: ready when cocked
   weaponStage cocking(TD_READY);
   weaponStage engaging(TD_ACTIVE);
+
+    //ACTION: uses firemodes
+  weaponStage fm_semi(TD_EITHER);
+  weaponStage fm_burst3(TD_EITHER);
+  weaponStage fm_full(TD_EITHER);
 
     //Bolt: ready when opened
   weaponStage opening(TD_READY);
@@ -860,6 +942,11 @@ int main()
   cocking.activationStage    = logic_cocking;
   engaging.activationStage   = logic_engaging;
 
+    //Action
+  fm_semi.activationStage    = firemode_semi;
+  fm_burst3.activationStage  = firemode_burst3;
+  fm_full.activationStage    = firemode_full;
+
     //Bolt
   opening.activationStage    = logic_opening;
   ejecting.activationStage   = logic_ejecting;
@@ -883,6 +970,11 @@ int main()
   hammer->weaponStages.push_back(cocking);
   hammer->weaponStages.push_back(engaging);
 
+    //Action
+  action->weaponStages.push_back(fm_semi);
+  action->weaponStages.push_back(fm_burst3);
+  action->weaponStages.push_back(fm_full);
+
     //Bolt
   bolt->weaponStages.push_back(opening);
   bolt->weaponStages.push_back(ejecting);
@@ -903,14 +995,14 @@ int main()
 //Assign weaponComponent to weaponSystem
 
     //NOTE: Needs to be in order of enum WEAP_COMPS_ENUMS
-  rifleAuto.weapComps.push_back(trigger);
-  rifleAuto.weapComps.push_back(hammer);
-  rifleAuto.weapComps.push_back(action);
-  rifleAuto.weapComps.push_back(feedPort);
-  rifleAuto.weapComps.push_back(bolt);
-  rifleAuto.weapComps.push_back(chamber);
-  rifleAuto.weapComps.push_back(barrel);
-  rifleAuto.weapComps.push_back(muzzle);
+  rifleAuto.addWeapComp(trigger);
+  rifleAuto.addWeapComp(hammer);
+  rifleAuto.addWeapComp(action);
+  rifleAuto.addWeapComp(feedPort);
+  rifleAuto.addWeapComp(bolt);
+  rifleAuto.addWeapComp(chamber);
+  rifleAuto.addWeapComp(barrel);
+  rifleAuto.addWeapComp(muzzle);
 
   weaponSystem curWeapon = rifleAuto;
   std::string input;
