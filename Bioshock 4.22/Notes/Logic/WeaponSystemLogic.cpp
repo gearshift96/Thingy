@@ -435,11 +435,10 @@ struct weapComp_Round : public weaponComponent
     {
       if(round == nullptr)
       {
-        std::cout << "Transfering round from source" << std::endl;
+        std::cout << "Transferring round from source" << std::endl;
 
         //USE std::move
         round = source->round;
-        delete source->round;
         source->round = nullptr;
 
         return true;
@@ -464,11 +463,10 @@ struct weapComp_Round : public weaponComponent
     {
       if(dest->round == nullptr)
       {
-        std::cout << "Transfering round to destination" << std::endl;
+        std::cout << "Transferring round to destination" << std::endl;
 
         //USE std::move
         dest->round = round;
-        delete round;
         round = nullptr;
 
         return true;
@@ -642,7 +640,13 @@ bool logic_feeding(struct weaponComponent* thisComp)
 
   std::cout << "Feeding" << std::endl;
 
-  reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::FEEDPORT])->activateComponent();
+  reinterpret_cast<weapComp_Round*>(thisComp)->
+    RoundTransferFrom
+    (
+      reinterpret_cast<weapComp_Round*>
+        (thisComp->parent->weapComps[weaponSystem::FEEDPORT])
+    );
+  //reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::FEEDPORT])->activateComponent();
 
   return true;
 }
@@ -662,9 +666,14 @@ bool logic_cycling(struct weaponComponent* thisComp)
 ////////////////////////////////////////
 //Loading:
 
-bool logic_loading(struct weaponComponent* /* thisComp */)
+bool logic_loading(struct weaponComponent* thisComp)
 {
   std::cout << "Loading" << std::endl;
+
+  //How to take magizine (a weapon component) external
+  //to the system to within the system?
+    //There may be logic required at the weaponSystem level for
+    //adding & removing weaponComponents to & from the system 
 
   return true;
 }
@@ -672,7 +681,7 @@ bool logic_loading(struct weaponComponent* /* thisComp */)
 ////////////////////////////////////////
 //Unloading:
 
-bool logic_unloading(struct weaponComponent* /* thisComp */)
+bool logic_unloading(struct weaponComponent* thisComp)
 {
   std::cout << "Unloading" << std::endl;
 
@@ -1241,6 +1250,7 @@ int main()
         std::cout << "*Inserting Magizine" << std::endl;
         detactableMag->roundCount = defaultRoundCount;
         reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = detactableMag;
+        bolt->activateComponent(false);
       }
     }
     else if(input == "f") //Fire Weapon
