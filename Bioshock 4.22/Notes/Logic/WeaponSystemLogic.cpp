@@ -140,8 +140,11 @@ struct weaponStage
 //can be affected externally from system or by other weapon components
 struct weaponComponent
 {
+  weaponComponent(std::string name_) : name(name_)
+  {}
+
   struct weaponSystem* parent = nullptr;
-  //std::string name;                  //UNUSED
+  std::string name;
   //float curPos;                      //UNUSED
   //float curRateOfChange;             //UNUSED
   //unsigned /*weaponState*/ curStage; //UNUSED
@@ -160,6 +163,9 @@ struct weaponComponent
   void CompToActivate(weaponComponent* compToActivate_,
                       triggerDirection trigDirCondition)
   {
+    std::cout << name << " is setting " << compToActivate_->name;
+    std::cout << " as component to activate" << std::endl;
+
     compToActivate      = compToActivate_;
     conditionToActivate = trigDirCondition;
   }
@@ -167,6 +173,9 @@ struct weaponComponent
   void CompToReady(weaponComponent* compToReady_,
                    triggerDirection trigDirCondition)
   {
+    std::cout << name << " is setting " << compToReady_->name;
+    std::cout << " as component to ready" << std::endl;
+
     compToReady      = compToReady_;
     conditionToReady = trigDirCondition;
   }
@@ -182,8 +191,10 @@ struct weaponComponent
   }
 
     //function pointer; activates all active weaponStages
-  virtual void activateComponent(bool overrideCheck = false)
+  virtual void activateComponent(bool activateNextComp = true)
   {
+    std::cout << activateNextComp << " Activating " << name << ":" << std::endl;
+
     while(curStage < weaponStages.size())
     {
       if(
@@ -206,11 +217,12 @@ struct weaponComponent
       }
     }
 
+if(activateNextComp)
+{
     if(IsActive())
     {
       if(compToActivate != nullptr)
       {
-if(overrideCheck == false)
         if(
            conditionToActivate == TD_EITHER
            || (conditionToActivate == TD_READY  && compToActivate->IsReady())
@@ -219,12 +231,41 @@ if(overrideCheck == false)
         {
           compToActivate->activateComponent();
         }
+        else
+        {
+          std::cout << compToActivate->name << " did not satisfy condition to activate" << std::endl;
+          std::cout << "  Condition needs to be: ";
+
+          switch(conditionToActivate)
+          {
+            case(TD_READY):
+              std::cout << "READY" << std::endl;
+              break;
+            case(TD_ACTIVE):
+              std::cout << "ACTIVE" << std::endl;
+              break;
+            case(TD_EITHER):
+              std::cout << "EITHER: this maybe an error..." << std::endl;
+              break;
+          }
+        }
+      }
+      else
+      {
+        std::cout << name << " has no component to activate" << std::endl;
       }
     }
+    else
+    {
+      std::cout << name << " could not activate" << std::endl;
+    }
+}
   }
 
-  void readyComponent(bool overrideCheck = false)
+  virtual void readyComponent(bool readyNextComp = true)
   {
+    std::cout << readyNextComp << " Readying " << name << ":" << std::endl;
+
     while(curStage > 0)
     {
       if(
@@ -247,21 +288,23 @@ if(overrideCheck == false)
       }
     }
 
+if(readyNextComp)
+{
     if(IsReady())
     {
       if(compToReady != nullptr)
       {
-if(overrideCheck == false)
         if(
            conditionToActivate == TD_EITHER
            || (conditionToActivate == TD_READY  && compToReady->IsReady())
            || (conditionToActivate == TD_ACTIVE && compToReady->IsActive())
           )
         {
-          compToReady->activateComponent();
+          compToReady->readyComponent();
         }
       }
     }
+}
   }
 };
 
@@ -276,6 +319,9 @@ struct FireMode
 //that will affect the firemode of the weaponAction
 struct weaponAction : public weaponComponent
 {
+  weaponAction(std::string name_) : weaponComponent(name_)
+  {}
+
   FireMode firemode;
 
   unsigned remainingRoundsPerPull; //once reached 0, end sequence
@@ -341,8 +387,15 @@ struct ws_projectile
 
 struct ws_round
 {
-  //ws_propellant *propellant;
-  ws_projectile *projectile;
+  ws_projectile *projectile = new ws_projectile;
+
+  ~ws_round()
+  {
+    if(projectile != nullptr)
+    {
+      delete projectile;
+    }
+  }
 
   bool activateRound()
   {
@@ -362,6 +415,9 @@ struct ws_round
 //Weapon Component that can contain a ws_round(s)
 struct weapComp_Round : public weaponComponent
 {
+  weapComp_Round(std::string name_) : weaponComponent(name_)
+  {}
+
   ws_round* round = nullptr;
 
   weapComp_Round* shouldTransferRoundTo = nullptr;
@@ -404,6 +460,9 @@ struct weapComp_Round : public weaponComponent
 
 struct ws_magizine : public weapComp_Round
 {
+  ws_magizine(std::string name_) : weapComp_Round(name_)
+  {}
+
   unsigned roundCount = defaultRoundCount;
   void ReadyRound()
   {
@@ -429,6 +488,9 @@ struct ws_magizine : public weapComp_Round
 
 struct weapComp_Port : public weaponComponent
 {
+  weapComp_Port(std::string name_) : weaponComponent(name_)
+  {}
+
   ws_magizine *magizine = nullptr;
 
   void ReadyRound()
@@ -627,7 +689,12 @@ bool logic_firing(struct weaponComponent* thisComp)
 
   std::cout << "Firing" << std::endl;
 
-  bool returnVale = reinterpret_cast<weapComp_Round*>(thisComp)->round->activateRound();
+  bool returnVale = false;
+
+  if(reinterpret_cast<weapComp_Round*>(thisComp)->round != nullptr)
+  {
+    returnVale = reinterpret_cast<weapComp_Round*>(thisComp)->round->activateRound();
+  }
 
   return returnVale;
 }
@@ -800,6 +867,8 @@ struct FireMode
 
 bool firemode_semi(struct weaponComponent* thisComp)
 {
+  std::cout << "Mode Semi" << std::endl;
+
   reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 1;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = false;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
@@ -809,6 +878,8 @@ bool firemode_semi(struct weaponComponent* thisComp)
 
 bool firemode_burst3(struct weaponComponent* thisComp)
 {
+  std::cout << "Mode Burst 3" << std::endl;
+
   reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 3;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
@@ -818,6 +889,8 @@ bool firemode_burst3(struct weaponComponent* thisComp)
 
 bool firemode_full(struct weaponComponent* thisComp)
 {
+  std::cout << "Mode Full" << std::endl;
+
   reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 0;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
   reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
@@ -836,22 +909,22 @@ int main()
 //Weapon Components
 
   //Pre-fire
-  weaponComponent *trigger   = new weaponComponent;
-  weaponComponent *hammer    = new weaponComponent;
-  weaponAction    *action    = new weaponAction;
+  weaponComponent *trigger   = new weaponComponent("Trigger");
+  weaponComponent *hammer    = new weaponComponent("Hammer");
+  weaponAction    *action    = new weaponAction("Action");
 
   //Firing
-  weapComp_Port   *feedPort  = new weapComp_Port;
-  weapComp_Round  *bolt      = new weapComp_Round;
-  weapComp_Round  *chamber   = new weapComp_Round;
-  //weaponComponent *ejectPort = new weaponComponent; //UNUSED
+  weapComp_Port   *feedPort  = new weapComp_Port("FeedPort");
+  weapComp_Round  *bolt      = new weapComp_Round("Bolt");
+  weapComp_Round  *chamber   = new weapComp_Round("Chamber");
+  //weaponComponent *ejectPort = new weaponComponent("EjectPort"); //UNUSED
 
   //Post-fire
-  weaponComponent *barrel    = new weaponComponent;
-  weaponComponent *muzzle    = new weaponComponent;
+  weaponComponent *barrel    = new weaponComponent("Barrel");
+  weaponComponent *muzzle    = new weaponComponent("Muzzle");
 
   //External Components
-  ws_magizine* detactableMag = new ws_magizine;
+  ws_magizine* detactableMag = new ws_magizine("Magizine");
 
 #if 0
   trigger->CompToActivate(hammer);
@@ -862,7 +935,9 @@ int main()
   //CompToActivate(component to activate, state component needs to be in for use)
 
 #if 0
-    //Opened-bolt rifle
+  std::cout << "Weapon: Opened-bolt Rifle" << std::endl;
+
+    //Opened-bolt Rifle
   trigger->CompToActivate(action, TD_READY);
   action->CompToActivate(bolt, TD_READY);
   //***No hammer
@@ -873,7 +948,9 @@ int main()
 
 #elif 1
 
-    //Closed-bolt rifle
+  std::cout << "Weapon: Closed-bolt Rifle" << std::endl;
+
+    //Closed-bolt Rifle
   trigger->CompToActivate(action, TD_READY);
   action->CompToActivate(hammer, TD_READY);
   hammer->CompToActivate(bolt, TD_ACTIVE);
@@ -883,12 +960,9 @@ int main()
   bolt->CompToReady(hammer, TD_EITHER);
   hammer->CompToReady(action, TD_EITHER);
 
-  //Make ready to fire
-  action->readyComponent(true);
-  hammer->readyComponent(true);
-  bolt->activateComponent(true);
-
 #else
+
+  std::cout << "Weapon: Semi-auto Pistol" << std::endl;
 
     //Semi-auto Pistol; bolt is slide
   trigger->CompToActivate(hammer, TD_EITHER);
@@ -1004,6 +1078,13 @@ int main()
   rifleAuto.addWeapComp(barrel);
   rifleAuto.addWeapComp(muzzle);
 
+    //Configure weapon to desired presets
+  action->readyComponent(false);
+  hammer->readyComponent(false);
+//std::cout << "Bolt status BEFORE: " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
+  bolt->activateComponent(false);
+//std::cout << "Bolt status AFTER:  " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
+
   weaponSystem curWeapon = rifleAuto;
   std::string input;
 
@@ -1016,7 +1097,7 @@ int main()
 #if 1
     if(input == "t") //Check Mag
     {
-      std::cout << "Ammo check:" << std::endl;
+      std::cout << "INPUT Ammo check:" << std::endl;
       if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
@@ -1033,7 +1114,7 @@ int main()
     }
     else if(input == "r") //Reload
     {
-      std::cout << "Reloading:" << std::endl;
+      std::cout << "INPUT Reloading:" << std::endl;
 
       bool shouldReload = true;
 
@@ -1061,7 +1142,7 @@ int main()
     }
     else if(input == "f") //Fire Weapon
     {
-      std::cout << "Firing:" << std::endl;
+      std::cout << "INPUT Firing:" << std::endl;
 
       curWeapon.weapComps[weaponSystem::TRIGGER]->activateComponent();
 
