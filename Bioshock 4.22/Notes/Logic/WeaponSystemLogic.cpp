@@ -420,15 +420,45 @@ struct weapComp_Round : public weaponComponent
 
   ws_round* round = nullptr;
 
-  weapComp_Round* shouldTransferRoundTo = nullptr;
+  //weapComp_Round* shouldTransferRoundTo = nullptr;
 
+/*
   void setRoundTransferDestination(weapComp_Round* dest)
   {
     shouldTransferRoundTo = dest;
   }
+*/
+
+  bool RoundTransferFrom(weapComp_Round* source)
+  {
+    if(source->round != nullptr)
+    {
+      if(round == nullptr)
+      {
+        std::cout << "Transfering round from source" << std::endl;
+
+        //USE std::move
+        round = source->round;
+        delete source->round;
+        source->round = nullptr;
+
+        return true;
+      }
+      else
+      {
+        std::cout << "Round already at source" << std::endl;
+      }
+    }
+    else
+    {
+      std::cout << "No round at destination" << std::endl;
+    }
+
+    return false;
+  }
 
     //TODO: Should rewrite logic to be RoundTransferFrom?
-  void RoundTransferTo(weapComp_Round* dest)
+  bool RoundTransferTo(weapComp_Round* dest)
   {
     if(round != nullptr)
     {
@@ -437,9 +467,11 @@ struct weapComp_Round : public weaponComponent
         std::cout << "Transfering round to destination" << std::endl;
 
         //USE std::move
-        delete dest->round;
         dest->round = round;
+        delete round;
         round = nullptr;
+
+        return true;
       }
       else
       {
@@ -450,12 +482,16 @@ struct weapComp_Round : public weaponComponent
     {
       std::cout << "No round at source" << std::endl;
     }
+
+    return false;
   }
 
+/*
   void TransferRound()
   {
     RoundTransferTo(shouldTransferRoundTo);
   }
+*/
 };
 
 struct ws_magizine : public weapComp_Round
@@ -464,6 +500,7 @@ struct ws_magizine : public weapComp_Round
   {}
 
   unsigned roundCount = defaultRoundCount;
+
   void ReadyRound()
   {
     if(round == nullptr)
@@ -501,12 +538,14 @@ struct weapComp_Port : public weaponComponent
     }
   }
 
-  void TransferRound()
+  bool RoundTransferTo(weapComp_Round* dest)
   {
     if(magizine != nullptr)
     {
-      magizine->TransferRound();
+      return magizine->RoundTransferTo(dest);
     }
+
+    return true;
   }
 };
 
@@ -575,9 +614,12 @@ struct bolt: public weaponComponent
 ////////////////////////////////////////
 //Opening:
 
-bool logic_opening(struct weaponComponent* /* thisComp */)
+bool logic_opening(struct weaponComponent* thisComp)
 {
   std::cout << "Opening" << std::endl;
+
+  reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::FEEDPORT])->readyComponent();
+
   return true;
 }
 
@@ -586,7 +628,7 @@ bool logic_opening(struct weaponComponent* /* thisComp */)
 //  -bolt beginning to close (animation + sound)
 //  -transitionRoundFromMagToBolt (transfer of object)
 
-bool logic_feeding(struct weaponComponent* /* thisComp */)
+bool logic_feeding(struct weaponComponent* thisComp)
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
@@ -599,6 +641,52 @@ bool logic_feeding(struct weaponComponent* /* thisComp */)
 */
 
   std::cout << "Feeding" << std::endl;
+
+  reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::FEEDPORT])->activateComponent();
+
+  return true;
+}
+
+////////////////////////////////////////
+//Cycling:
+
+bool logic_cycling(struct weaponComponent* thisComp)
+{
+  std::cout << "Cycling" << std::endl;
+
+  reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT]));
+
+  return true;
+}
+
+////////////////////////////////////////
+//Loading:
+
+bool logic_loading(struct weaponComponent* /* thisComp */)
+{
+  std::cout << "Loading" << std::endl;
+
+  return true;
+}
+
+////////////////////////////////////////
+//Unloading:
+
+bool logic_unloading(struct weaponComponent* /* thisComp */)
+{
+  std::cout << "Unloading" << std::endl;
+
+  return true;
+}
+
+////////////////////////////////////////
+//Readying
+
+bool logic_readying(struct weaponComponent* thisComp)
+{
+  std::cout << "Readying" << std::endl;
+
+  reinterpret_cast<weapComp_Port*>(thisComp)->ReadyRound();
 
   return true;
 }
@@ -618,7 +706,7 @@ bool logic_emptying(struct weaponComponent* /* thisComp */)
 //  -bolt finsihing to close (animation + sound)
 //  -transitionRoundFromBoltToChamber (transfer of object)
 
-bool logic_chambing(struct weaponComponent* /* thisComp */)
+bool logic_chambing(struct weaponComponent* thisComp)
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosChambering);
@@ -632,7 +720,7 @@ bool logic_chambing(struct weaponComponent* /* thisComp */)
 
   std::cout << "Chambing" << std::endl;
 
-  return true;
+  return reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferFrom(reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT]));
 }
 
 ////////////////////////////////////////
@@ -716,7 +804,7 @@ bool logic_firing(struct weaponComponent* thisComp)
 //Extracting:
 //  -transitionRound(Remains)FromChamberToBolt (transfer of object)
 
-bool logic_extracting(struct weaponComponent* /* thisComp */)
+bool logic_extracting(struct weaponComponent* thisComp)
 {
 /*
   animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
@@ -729,14 +817,15 @@ bool logic_extracting(struct weaponComponent* /* thisComp */)
 */
 
   std::cout << "Extracting" << std::endl;
-  return true;
+
+  return reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT]));
 }
 
 ////////////////////////////////////////
 //Ejecting:
 //  -ejectRoundFromBolt (sound + particle effects + spawning object)
 
-bool logic_ejecting(struct weaponComponent* /* thisComp */)
+bool logic_ejecting(struct weaponComponent* thisComp)
 {
 /*
   playSound(firearm.ejectionSound);
@@ -748,6 +837,13 @@ bool logic_ejecting(struct weaponComponent* /* thisComp */)
 */
 
   std::cout << "Ejecting" << std::endl;
+
+  if(reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])->round != nullptr)
+  {
+    delete reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])->round;
+    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])->round = nullptr;
+  }
+
   return true;
 }
 
@@ -986,23 +1082,25 @@ int main()
   weaponStage cocking(TD_READY);
   weaponStage engaging(TD_ACTIVE);
 
-    //ACTION: uses firemodes
+    //Action: uses firemodes
   weaponStage fm_semi(TD_EITHER);
   weaponStage fm_burst3(TD_EITHER);
   weaponStage fm_full(TD_EITHER);
 
+    //Feedport
+  weaponStage readying(TD_READY);
+  weaponStage cycling(TD_ACTIVE);
+
     //Bolt: ready when opened
   weaponStage opening(TD_READY);
+  weaponStage feeding(TD_ACTIVE);
   weaponStage ejecting(TD_READY);
   weaponStage extracting(TD_READY);
-  weaponStage feeding(TD_ACTIVE);
   weaponStage closing(TD_ACTIVE);
 
     //Chamber: ready when emptied
   weaponStage emptying(TD_READY);
   weaponStage chambing(TD_ACTIVE); //take round from BOLT
-
-    //Round
   weaponStage firing(TD_ACTIVE);
 
 //////////////////////////////
@@ -1021,11 +1119,15 @@ int main()
   fm_burst3.activationStage  = firemode_burst3;
   fm_full.activationStage    = firemode_full;
 
+    //FeedPort
+  readying.activationStage   = logic_readying;
+  cycling.activationStage    = logic_cycling;
+
     //Bolt
   opening.activationStage    = logic_opening;
+  feeding.activationStage    = logic_feeding;
   ejecting.activationStage   = logic_ejecting;
   extracting.activationStage = logic_extracting;
-  feeding.activationStage    = logic_feeding;
   closing.activationStage    = logic_closing;
 
     //Chamber
@@ -1051,12 +1153,13 @@ int main()
 
     //Bolt
   bolt->weaponStages.push_back(opening);
+  bolt->weaponStages.push_back(feeding);
   bolt->weaponStages.push_back(ejecting);
   bolt->weaponStages.push_back(extracting);
-  bolt->weaponStages.push_back(feeding);
   bolt->weaponStages.push_back(closing);
 
     //Chamber
+  chamber->weaponStages.push_back(emptying);
   chamber->weaponStages.push_back(chambing);
   chamber->weaponStages.push_back(firing);
 
@@ -1079,10 +1182,10 @@ int main()
   rifleAuto.addWeapComp(muzzle);
 
     //Configure weapon to desired presets
-  action->readyComponent(false);
-  hammer->readyComponent(false);
+  //action->readyComponent(false);
+  //hammer->readyComponent(false);
 //std::cout << "Bolt status BEFORE: " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
-  bolt->activateComponent(false);
+  //bolt->activateComponent(false);
 //std::cout << "Bolt status AFTER:  " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
 
   weaponSystem curWeapon = rifleAuto;
