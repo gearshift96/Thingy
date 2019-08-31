@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <iomanip> //DEBUG
 
 static const unsigned defaultRoundCount = 10;
 
@@ -165,8 +166,12 @@ struct weaponComponent
   void CompToActivate(weaponComponent* compToActivate_,
                       triggerDirection trigDirCondition)
   {
-    std::cout << name << " is setting " << compToActivate_->name;
-    std::cout << " as component to activate" << std::endl;
+    std::cout
+    << std::left << std::setw(7)
+    << name << " is setting: "
+    << std::left << std::setw(7)
+    << compToActivate_->name
+    << " as component to ACTIVATE" << std::endl;
 
     compToActivate      = compToActivate_;
     conditionToActivate = trigDirCondition;
@@ -175,8 +180,12 @@ struct weaponComponent
   void CompToReady(weaponComponent* compToReady_,
                    triggerDirection trigDirCondition)
   {
-    std::cout << name << " is setting " << compToReady_->name;
-    std::cout << " as component to ready" << std::endl;
+    std::cout
+    << std::left << std::setw(7)
+    << name << " is setting: "
+    << std::left << std::setw(7)
+    << compToReady_->name
+    << " as component to READY" << std::endl;
 
     compToReady      = compToReady_;
     conditionToReady = trigDirCondition;
@@ -638,20 +647,34 @@ struct weaponSystem
 
     if(weapComps[weaponSystem::MAGIZINE] != nullptr)
     {
-      std::cout << "Name of Magizine: " << weapComps[weaponSystem::MAGIZINE]->name << std::endl;
+      std::cout
+      << std::left << std::setw(25)
+      << "Name of Magizine: "
+      << weapComps[weaponSystem::MAGIZINE]->name << std::endl;
     }
     else
     {
-      std::cout << "Name of Magizine: N/A" << std::endl;
+      std::cout
+      << std::left << std::setw(25)
+      << "Name of Magizine: "
+      << "N/A" << std::endl;
     }
 
     if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(weapComps[weaponSystem::FEEDPORT])->object != nullptr)
     {
-      std::cout << "Name of Feedport: " << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(weapComps[weaponSystem::FEEDPORT])->object->name << std::endl;
+      std::cout
+      << std::left << std::setw(25)
+      << "Name of Feedport object: "
+      << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(
+           weapComps[weaponSystem::FEEDPORT])->object->name
+      << std::endl;
     }
     else
     {
-      std::cout << "Name of Feedport: N/A" << std::endl;
+      std::cout
+      << std::left << std::setw(25)
+      << "Name of Feedport object: "
+      << "N/A" << std::endl;
     }
 
     std::cout << "***DEBUG END***" << std::endl;
@@ -1103,7 +1126,7 @@ bool firemode_full(struct weaponComponent* thisComp)
 
 weapComp_Mag* rulesForAdding_Mag()
 {
-  std::cout << "Applying rule for adding magizine" << std::endl;
+  std::cout << "Applying rule for adding   magizine" << std::endl;
   return gcc.reachableMag;
 }
 
@@ -1144,7 +1167,23 @@ int main()
 
   detactableMag->roundsContained = basicRounds;
   gcc.reachableMag               = detactableMag;
-  //feedPort->cc.reachableMag    = gcc.reachableMag;
+
+  //Debug
+//std::cout << "feedPort->cc.reachableMag name:    ";
+//if(feedPort->cc.reachableMag != nullptr)
+//std::cout << feedPort->cc.reachableMag->name << std::endl;
+//else
+//std::cout << "N/A" << std::endl;
+
+  feedPort->cc.reachableMag      = gcc.reachableMag;
+
+  //Debug
+//std::cout << "feedPort->cc.reachableMag name:    ";
+//if(feedPort->cc.reachableMag != nullptr)
+//std::cout << feedPort->cc.reachableMag->name << std::endl;
+//else
+//std::cout << "N/A" << std::endl;
+
   feedPort->rulesForAdding       = rulesForAdding_Mag;
   feedPort->rulesForRemoving     = rulesForRemoving_Mag;
 
@@ -1156,7 +1195,7 @@ int main()
 #else
   //CompToActivate(component to activate, state component needs to be in for use)
 
-std::cout << "**Initializing Weapons: START**" << std::endl;
+std::cout << "\n**Initializing Weapons: START**" << std::endl;
 
 #if 0
   std::cout << "Weapon: Opened-bolt Rifle" << std::endl;
@@ -1320,6 +1359,28 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   rifleAuto.addWeapComp(muzzle);   //MUZZLE,
   rifleAuto.addWeapComp(nullptr);  //MAGIZINE,
 
+  weaponSystem curWeapon = rifleAuto;
+
+//Debug
+{
+  std::cout << "\n**DEBUG START**" << std::endl;
+  std::cout << "gcc.reachableMag name:           " << gcc.reachableMag->name << std::endl;
+  std::cout << "detactableMag name:              " << detactableMag->name << std::endl;
+                                                 
+  std::cout << "FEEDPORT->object->name:          ";
+  if(reinterpret_cast<weaponComponent*>(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object) != nullptr)
+  std::cout << reinterpret_cast<weaponComponent*>(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object)->name << std::endl;
+  else
+  std::cout << "N/A" << std::endl;
+
+  std::cout << "FEEDPORT->cc.reachableMag->name: ";
+  if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->cc.reachableMag != nullptr)
+  std::cout << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->cc.reachableMag->name << std::endl;
+  else
+  std::cout << "N/A" << std::endl;
+  std::cout << "***DEBUG END***" << std::endl;
+}
+
     //Configure weapon to desired presets
   //action->readyComponent(false);
   //hammer->readyComponent(false);
@@ -1327,7 +1388,6 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   //bolt->activateComponent(false);
 //std::cout << "Bolt status AFTER:  " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
 
-  weaponSystem curWeapon = rifleAuto;
   std::string input;
 
   while(input != "q")
