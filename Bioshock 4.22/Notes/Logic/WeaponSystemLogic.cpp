@@ -1,3 +1,5 @@
+//Author: Danny Jundi
+
 ////////////////////////////////////////////////////////////////////////////////
 //INCLUDES
 
@@ -329,57 +331,6 @@ struct weaponAction : public weaponComponent
   void activateComponent();
 };
 
-struct weaponSystem
-{
-/* //UNUSED
-  enum states
-  {
-    Before,
-    UpTo,
-    After
-  };
-*/
-
-  enum WEAP_COMPS_ENUMS
-  {
-    TRIGGER,
-    HAMMER,
-    ACTION,
-    FEEDPORT,
-    BOLT,
-    CHAMBER,
-    BARREL,
-    MUZZLE
-  };
-
-    //string: name of stage for component to act towards
-  //void activateComponent(states, std::string); //UNUSED
-
-    //TODO: Change to std::vector<weaponComponent*>
-  std::vector<weaponComponent*> weapComps;
-
-  void addWeapComp(weaponComponent* weapComp)
-  {
-    weapComps.push_back(weapComp);
-    weapComp->parent = this;
-  }
-};
-
-void weaponAction::activateComponent()
-{
-  std::cout << "Actioning" << std::endl;
-
-  if(firemode.triggerCheck)
-  {
-    if(parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
-    {
-      return;
-    }
-  }
-
-  //weaponComponent::activateComponent();
-}
-
 #if 1
 struct ws_projectile
 {
@@ -521,30 +472,61 @@ struct ws_magizine : public weapComp_Round
   }
 };
 
+template <typename T>
+struct colliderConditional
+{
+  T* reachableMag = nullptr;
+};
+
+static colliderConditional<ws_magizine> gcc;
+
+//Responsible for making REQUESTS to the system to add & remove set weaponComponents
+  //T is a ws_magizine
+  //^In the specific use case in which this prototype is being developed
+template <typename T>
 struct weapComp_Port : public weaponComponent
 {
   weapComp_Port(std::string name_) : weaponComponent(name_)
   {}
 
-  ws_magizine *magizine = nullptr;
+  T *object = nullptr;
+  colliderConditional<T> cc;
 
+  T* (*rulesForAdding)()   = nullptr;
+  T* (*rulesForRemoving)() = nullptr;
+
+  bool IsObjectAttached()
+  {
+    return object != nullptr;
+  }
+
+  bool IsObjectDisattached()
+  {
+    return object == nullptr;
+  }
+
+  void activateComponent();
+  void readyComponent();
+
+/* 
   void ReadyRound()
   {
-    if(magizine != nullptr)
+    if(object != nullptr)
     {
-      magizine->ReadyRound();
+      object->ReadyRound();
     }
   }
 
   bool RoundTransferTo(weapComp_Round* dest)
   {
-    if(magizine != nullptr)
+    if(object != nullptr)
     {
-      return magizine->RoundTransferTo(dest);
+      return object->RoundTransferTo(dest);
     }
 
     return true;
   }
+ */
 };
 
 #endif
@@ -589,6 +571,75 @@ struct bolt: public weaponComponent
 #endif
 };
 #endif
+
+struct weaponSystem
+{
+/* //UNUSED
+  enum states
+  {
+    Before,
+    UpTo,
+    After
+  };
+*/
+
+  template <typename T>
+  void modComp(T* weapComp, T* (*rules)())
+  {
+    weapComp = rules();
+  }
+
+  enum WEAP_COMPS_ENUMS
+  {
+    TRIGGER,
+    HAMMER,
+    ACTION,
+    FEEDPORT,
+    BOLT,
+    CHAMBER,
+    BARREL,
+    MUZZLE
+  };
+
+    //string: name of stage for component to act towards
+  //void activateComponent(states, std::string); //UNUSED
+
+    //TODO: Change to std::vector<weaponComponent*>
+  std::vector<weaponComponent*> weapComps;
+
+  void addWeapComp(weaponComponent* weapComp)
+  {
+    weapComps.push_back(weapComp);
+    weapComp->parent = this;
+  }
+};
+
+void weaponAction::activateComponent()
+{
+  std::cout << "Actioning" << std::endl;
+
+  if(firemode.triggerCheck)
+  {
+    if(parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
+    {
+      return;
+    }
+  }
+
+  //weaponComponent::activateComponent();
+}
+
+template <typename T>
+void weapComp_Port<T>::activateComponent()
+{
+  parent->modComp<weapComp_Port<T>>(object, rulesForAdding);
+}
+
+template <typename T>
+void weapComp_Port<T>::readyComponent()
+{
+  parent->modComp<weapComp_Port<T>>(object, rulesForRemoving);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //LOGIC
@@ -666,12 +717,12 @@ bool logic_cycling(struct weaponComponent* thisComp)
 ////////////////////////////////////////
 //Loading:
 
-bool logic_loading(struct weaponComponent* thisComp)
+bool logic_loading(struct weaponComponent* /* thisComp */)
 {
   std::cout << "Loading" << std::endl;
 
-  //How to take magizine (a weapon component) external
-  //to the system to within the system?
+  //IMPORTANT: How to take magizine (a weapon component)
+  //external to the system to within the system?
     //There may be logic required at the weaponSystem level for
     //adding & removing weaponComponents to & from the system 
 
@@ -681,7 +732,7 @@ bool logic_loading(struct weaponComponent* thisComp)
 ////////////////////////////////////////
 //Unloading:
 
-bool logic_unloading(struct weaponComponent* thisComp)
+bool logic_unloading(struct weaponComponent* /* thisComp */)
 {
   std::cout << "Unloading" << std::endl;
 
@@ -695,7 +746,7 @@ bool logic_readying(struct weaponComponent* thisComp)
 {
   std::cout << "Readying" << std::endl;
 
-  reinterpret_cast<weapComp_Port*>(thisComp)->ReadyRound();
+  reinterpret_cast<ws_magizine*>(thisComp)->ReadyRound();
 
   return true;
 }
@@ -1003,6 +1054,21 @@ bool firemode_full(struct weaponComponent* thisComp)
   return true;
 }
 
+////////////////////////////////////////
+//Rules for adding/removing components
+
+ws_magizine* rulesForAdding_Mag()
+{
+  std::cout << "Applying rule for adding magizine" << std::endl;
+  return gcc.reachableMag;
+}
+
+ws_magizine* rulesForRemoving_Mag()
+{
+  std::cout << "Applying rule for removing magizine" << std::endl;
+  return nullptr;
+}
+
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1019,7 +1085,7 @@ int main()
   weaponAction    *action    = new weaponAction("Action");
 
   //Firing
-  weapComp_Port   *feedPort  = new weapComp_Port("FeedPort");
+  weapComp_Port<ws_magizine>   *feedPort  = new weapComp_Port<ws_magizine>("FeedPort");
   weapComp_Round  *bolt      = new weapComp_Round("Bolt");
   weapComp_Round  *chamber   = new weapComp_Round("Chamber");
   //weaponComponent *ejectPort = new weaponComponent("EjectPort"); //UNUSED
@@ -1030,6 +1096,11 @@ int main()
 
   //External Components
   ws_magizine* detactableMag = new ws_magizine("Magizine");
+
+  gcc.reachableMag           = detactableMag;
+  //feedPort->cc.reachableMag  = gcc.reachableMag;
+  feedPort->rulesForAdding   = rulesForAdding_Mag;
+  feedPort->rulesForRemoving = rulesForRemoving_Mag;
 
 #if 0
   trigger->CompToActivate(hammer);
@@ -1210,17 +1281,17 @@ int main()
     if(input == "t") //Check Mag
     {
       std::cout << "INPUT Ammo check:" << std::endl;
-      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine == nullptr)
+      if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->IsObjectDisattached())//->object == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount == 0)
+      else if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount == 0)
       {
         std::cout << "*Magizine EMPTY" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount > 0)
+      else if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount > 0)
       {
-        std::cout << "*" << reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine->roundCount;
+        std::cout << "*" << reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount;
         std::cout << " Rounds in Magizine" << std::endl;
       }
     }
@@ -1231,7 +1302,7 @@ int main()
       bool shouldReload = true;
 
         //If weapon already has magizine
-      if(reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine != nullptr)
+      if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->IsObjectAttached())//object != nullptr)
       {
         if(detactableMag->roundCount == defaultRoundCount)
         {
@@ -1241,7 +1312,7 @@ int main()
         else
         {
           std::cout << "*Releasing Magizine" << std::endl;
-          reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = nullptr;
+          curWeapon.weapComps[weaponSystem::FEEDPORT]->readyComponent(); //object = nullptr;
         }
       }
 
@@ -1249,7 +1320,7 @@ int main()
       {
         std::cout << "*Inserting Magizine" << std::endl;
         detactableMag->roundCount = defaultRoundCount;
-        reinterpret_cast<weapComp_Port*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->magizine = detactableMag;
+        curWeapon.weapComps[weaponSystem::FEEDPORT]->activateComponent(); //object = detactableMag;
         bolt->activateComponent(false);
       }
     }
