@@ -318,10 +318,10 @@ struct FireMode
 };
 
 //Each weaponStage of the weaponComponent contain their unique firemode
-//that will affect the firemode of the weaponAction
-struct weaponAction : public weaponComponent
+//that will affect the firemode of the weapComp_Action
+struct weapComp_Action : public weaponComponent
 {
-  weaponAction(std::string name_) : weaponComponent(name_)
+  weapComp_Action(std::string name_) : weaponComponent(name_)
   {}
 
   FireMode firemode;
@@ -435,6 +435,19 @@ struct weapComp_Round : public weaponComponent
     return false;
   }
 
+  void activateRound()
+  {
+    if(round != nullptr)
+    {
+      std::cout << "Activating round in " << name << std::endl;
+      round->activateRound();
+    }
+    else
+    {
+      std::cout << "No round to activate in " << name << std::endl;
+    }
+  }
+
 /*
   void TransferRound()
   {
@@ -443,11 +456,12 @@ struct weapComp_Round : public weaponComponent
 */
 };
 
-struct ws_magizine : public weapComp_Round
+struct weapComp_Mag : public weapComp_Round
 {
-  ws_magizine(std::string name_) : weapComp_Round(name_)
+  weapComp_Mag(std::string name_) : weapComp_Round(name_)
   {}
 
+  ws_round* roundsContained = nullptr;
   unsigned roundCount = defaultRoundCount;
 
   void ReadyRound()
@@ -458,7 +472,7 @@ struct ws_magizine : public weapComp_Round
       {
         std::cout << "Readying Round" << std::endl;
         --roundCount;
-        round = new ws_round;
+        round = roundsContained;
       }
       else
       {
@@ -478,10 +492,10 @@ struct colliderConditional
   T* reachableMag = nullptr;
 };
 
-static colliderConditional<ws_magizine> gcc;
+static colliderConditional<weapComp_Mag> gcc;
 
 //Responsible for making REQUESTS to the system to add & remove set weaponComponents
-  //T is a ws_magizine
+  //T is a weapComp_Mag
   //^In the specific use case in which this prototype is being developed
 template <typename T>
 struct weapComp_Port : public weaponComponent
@@ -598,7 +612,8 @@ struct weaponSystem
     BOLT,
     CHAMBER,
     BARREL,
-    MUZZLE
+    MUZZLE,
+    MAGIZINE,
   };
 
     //string: name of stage for component to act towards
@@ -610,11 +625,40 @@ struct weaponSystem
   void addWeapComp(weaponComponent* weapComp)
   {
     weapComps.push_back(weapComp);
-    weapComp->parent = this;
+
+    if(weapComp != nullptr)
+    {
+      weapComp->parent = this;
+    }
+  }
+
+  void debug()
+  {
+    std::cout << "**DEBUG START**" << std::endl;
+
+    if(weapComps[weaponSystem::MAGIZINE] != nullptr)
+    {
+      std::cout << "Name of Magizine: " << weapComps[weaponSystem::MAGIZINE]->name << std::endl;
+    }
+    else
+    {
+      std::cout << "Name of Magizine: N/A" << std::endl;
+    }
+
+    if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(weapComps[weaponSystem::FEEDPORT])->object != nullptr)
+    {
+      std::cout << "Name of Feedport: " << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(weapComps[weaponSystem::FEEDPORT])->object->name << std::endl;
+    }
+    else
+    {
+      std::cout << "Name of Feedport: N/A" << std::endl;
+    }
+
+    std::cout << "***DEBUG END***" << std::endl;
   }
 };
 
-void weaponAction::activateComponent()
+void weapComp_Action::activateComponent()
 {
   std::cout << "Actioning" << std::endl;
 
@@ -746,7 +790,7 @@ bool logic_readying(struct weaponComponent* thisComp)
 {
   std::cout << "Readying" << std::endl;
 
-  reinterpret_cast<ws_magizine*>(thisComp)->ReadyRound();
+  reinterpret_cast<weapComp_Mag*>(thisComp)->ReadyRound();
 
   return true;
 }
@@ -950,10 +994,10 @@ bool logic_pulling(struct weaponComponent* thisComp)
 {
   std::cout << "Pulling" << std::endl;
 
-  if(reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerPull)
+  if(reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerPull)
   {
-    reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
-      = reinterpret_cast<weaponAction*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
+    reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
+      = reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
   }
 
   return true;
@@ -1025,9 +1069,9 @@ bool firemode_semi(struct weaponComponent* thisComp)
 {
   std::cout << "Mode Semi" << std::endl;
 
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 1;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = false;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 1;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = false;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
 
   return true;
 }
@@ -1036,9 +1080,9 @@ bool firemode_burst3(struct weaponComponent* thisComp)
 {
   std::cout << "Mode Burst 3" << std::endl;
 
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 3;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 3;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = true;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
 
   return true;
 }
@@ -1047,9 +1091,9 @@ bool firemode_full(struct weaponComponent* thisComp)
 {
   std::cout << "Mode Full" << std::endl;
 
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.roundsPerPull      = 0;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.triggerCheck       = true;
-  reinterpret_cast<weaponAction*>(thisComp)->firemode.resetOnTriggerPull = true;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 0;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = true;
+  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
 
   return true;
 }
@@ -1057,13 +1101,13 @@ bool firemode_full(struct weaponComponent* thisComp)
 ////////////////////////////////////////
 //Rules for adding/removing components
 
-ws_magizine* rulesForAdding_Mag()
+weapComp_Mag* rulesForAdding_Mag()
 {
   std::cout << "Applying rule for adding magizine" << std::endl;
   return gcc.reachableMag;
 }
 
-ws_magizine* rulesForRemoving_Mag()
+weapComp_Mag* rulesForRemoving_Mag()
 {
   std::cout << "Applying rule for removing magizine" << std::endl;
   return nullptr;
@@ -1080,27 +1124,29 @@ int main()
 //Weapon Components
 
   //Pre-fire
-  weaponComponent *trigger   = new weaponComponent("Trigger");
-  weaponComponent *hammer    = new weaponComponent("Hammer");
-  weaponAction    *action    = new weaponAction("Action");
+  weaponComponent *trigger    = new weaponComponent("Trigger");
+  weaponComponent *hammer     = new weaponComponent("Hammer");
+  weapComp_Action *action     = new weapComp_Action("Action");
 
   //Firing
-  weapComp_Port<ws_magizine>   *feedPort  = new weapComp_Port<ws_magizine>("FeedPort");
-  weapComp_Round  *bolt      = new weapComp_Round("Bolt");
-  weapComp_Round  *chamber   = new weapComp_Round("Chamber");
-  //weaponComponent *ejectPort = new weaponComponent("EjectPort"); //UNUSED
+  weapComp_Port<weapComp_Mag> *feedPort  = new weapComp_Port<weapComp_Mag>("FeedPort");
+  weapComp_Round  *bolt       = new weapComp_Round("Bolt");
+  weapComp_Round  *chamber    = new weapComp_Round("Chamber");
+  //weaponComponent *ejectPort  = new weaponComponent("EjectPort"); //UNUSED
 
   //Post-fire
-  weaponComponent *barrel    = new weaponComponent("Barrel");
-  weaponComponent *muzzle    = new weaponComponent("Muzzle");
+  weaponComponent *barrel     = new weaponComponent("Barrel");
+  weaponComponent *muzzle     = new weaponComponent("Muzzle");
 
   //External Components
-  ws_magizine* detactableMag = new ws_magizine("Magizine");
+  weapComp_Mag* detactableMag = new weapComp_Mag("Magizine");
+  ws_round* basicRounds       = new ws_round;
 
-  gcc.reachableMag           = detactableMag;
-  //feedPort->cc.reachableMag  = gcc.reachableMag;
-  feedPort->rulesForAdding   = rulesForAdding_Mag;
-  feedPort->rulesForRemoving = rulesForRemoving_Mag;
+  detactableMag->roundsContained = basicRounds;
+  gcc.reachableMag               = detactableMag;
+  //feedPort->cc.reachableMag    = gcc.reachableMag;
+  feedPort->rulesForAdding       = rulesForAdding_Mag;
+  feedPort->rulesForRemoving     = rulesForRemoving_Mag;
 
 #if 0
   trigger->CompToActivate(hammer);
@@ -1109,6 +1155,8 @@ int main()
 
 #else
   //CompToActivate(component to activate, state component needs to be in for use)
+
+std::cout << "**Initializing Weapons: START**" << std::endl;
 
 #if 0
   std::cout << "Weapon: Opened-bolt Rifle" << std::endl;
@@ -1149,6 +1197,8 @@ int main()
 
 #endif
 
+std::cout << "***Initializing Weapons: END***" << std::endl;
+
 #endif
 
 //////////////////////////////
@@ -1181,7 +1231,10 @@ int main()
     //Chamber: ready when emptied
   weaponStage emptying(TD_READY);
   weaponStage chambing(TD_ACTIVE); //take round from BOLT
-  weaponStage firing(TD_ACTIVE);
+
+    //Round
+  //weaponStage priming(TD_READY);
+  //weaponStage firing(TD_ACTIVE);
 
 //////////////////////////////
 //Assign activationStage to weaponStage
@@ -1213,7 +1266,10 @@ int main()
     //Chamber
   emptying.activationStage   = logic_emptying;
   chambing.activationStage   = logic_chambing;
-  firing.activationStage     = logic_firing;
+
+    //Round
+  //priming.activationStage    = logic_priming;
+  //firing.activationStage     = logic_firing;
 
 //////////////////////////////
 //Assign weaponStage to weaponComponent
@@ -1241,7 +1297,9 @@ int main()
     //Chamber
   chamber->weaponStages.push_back(emptying);
   chamber->weaponStages.push_back(chambing);
-  chamber->weaponStages.push_back(firing);
+
+    //Round
+  //basicRounds->weaponStages.push_back(firing);
 
 //////////////////////////////
 //Weapon Systems
@@ -1252,14 +1310,15 @@ int main()
 //Assign weaponComponent to weaponSystem
 
     //NOTE: Needs to be in order of enum WEAP_COMPS_ENUMS
-  rifleAuto.addWeapComp(trigger);
-  rifleAuto.addWeapComp(hammer);
-  rifleAuto.addWeapComp(action);
-  rifleAuto.addWeapComp(feedPort);
-  rifleAuto.addWeapComp(bolt);
-  rifleAuto.addWeapComp(chamber);
-  rifleAuto.addWeapComp(barrel);
-  rifleAuto.addWeapComp(muzzle);
+  rifleAuto.addWeapComp(trigger);  //TRIGGER,
+  rifleAuto.addWeapComp(hammer);   //HAMMER,
+  rifleAuto.addWeapComp(action);   //ACTION,
+  rifleAuto.addWeapComp(feedPort); //FEEDPORT,
+  rifleAuto.addWeapComp(bolt);     //BOLT,
+  rifleAuto.addWeapComp(chamber);  //CHAMBER,
+  rifleAuto.addWeapComp(barrel);   //BARREL,
+  rifleAuto.addWeapComp(muzzle);   //MUZZLE,
+  rifleAuto.addWeapComp(nullptr);  //MAGIZINE,
 
     //Configure weapon to desired presets
   //action->readyComponent(false);
@@ -1281,17 +1340,20 @@ int main()
     if(input == "t") //Check Mag
     {
       std::cout << "INPUT Ammo check:" << std::endl;
-      if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->IsObjectDisattached())//->object == nullptr)
+
+      curWeapon.debug();
+
+      if(curWeapon.weapComps[weaponSystem::MAGIZINE] == nullptr)//->object == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount == 0)
+      else if(reinterpret_cast<weapComp_Mag*>(curWeapon.weapComps[weaponSystem::MAGIZINE])->roundCount == 0)
       {
         std::cout << "*Magizine EMPTY" << std::endl;
       }
-      else if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount > 0)
+      else if(reinterpret_cast<weapComp_Mag*>(curWeapon.weapComps[weaponSystem::MAGIZINE])->roundCount > 0)
       {
-        std::cout << "*" << reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object->roundCount;
+        std::cout << "*" << reinterpret_cast<weapComp_Mag*>(curWeapon.weapComps[weaponSystem::MAGIZINE])->roundCount;
         std::cout << " Rounds in Magizine" << std::endl;
       }
     }
@@ -1302,7 +1364,7 @@ int main()
       bool shouldReload = true;
 
         //If weapon already has magizine
-      if(reinterpret_cast<weapComp_Port<ws_magizine>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->IsObjectAttached())//object != nullptr)
+      if(curWeapon.weapComps[weaponSystem::MAGIZINE])
       {
         if(detactableMag->roundCount == defaultRoundCount)
         {
@@ -1312,15 +1374,23 @@ int main()
         else
         {
           std::cout << "*Releasing Magizine" << std::endl;
-          curWeapon.weapComps[weaponSystem::FEEDPORT]->readyComponent(); //object = nullptr;
+          curWeapon.weapComps[weaponSystem::FEEDPORT]->readyComponent(false);
         }
       }
 
       if(shouldReload == true)
       {
+        if(bolt->IsReady() == false)
+        {
+          bolt->readyComponent(false);
+        }
+
         std::cout << "*Inserting Magizine" << std::endl;
         detactableMag->roundCount = defaultRoundCount;
-        curWeapon.weapComps[weaponSystem::FEEDPORT]->activateComponent(); //object = detactableMag;
+
+        curWeapon.debug();
+
+        curWeapon.weapComps[weaponSystem::FEEDPORT]->activateComponent(false);
         bolt->activateComponent(false);
       }
     }
