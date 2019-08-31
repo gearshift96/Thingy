@@ -321,10 +321,100 @@ if(readyNextComp)
 
 struct FireMode
 {
+  FireMode
+  (
+    std::string modeName_,
+    unsigned roundsPerPull_,
+    bool triggerCheck_,
+    bool resetOnTriggerRelease_
+  )
+  : modeName(modeName_)
+  , roundsPerPull(roundsPerPull_)
+  , triggerCheck(triggerCheck_)
+  , resetOnTriggerRelease(resetOnTriggerRelease_)
+
+  {}
+
+  std::string modeName;
   unsigned roundsPerPull; //0 implies full auto //<-??
   bool triggerCheck; //to check if trigger is activie before continuing on sequence
-  bool resetOnTriggerPull; //if(remainingRoundsPerPull == 0){/*reset anyway*/}
+  bool resetOnTriggerRelease; //if(remainingRoundsPerPull == 0){/*reset anyway*/}
 };
+
+struct FireModes
+{
+  std::vector<FireMode> firemodes;
+  unsigned curFiremode = 0;
+
+  FireMode cycleFiremodes()
+  {
+    FireMode firemodeToReturn = firemodes[++curFiremode];
+
+    if(curFiremode == firemodes.size())
+    {
+      curFiremode = 0;
+    }
+
+    return firemodeToReturn;
+  }
+};
+
+////////////////////////////////////////
+//Firemodes
+
+  //semi
+    //1
+    //false/true  (same difference)
+    //true /false (same difference)
+
+  //full
+    //0
+    //true /false (false means to keep firing until ammo in system is exhausted)
+    //true /false (same difference)
+
+  //burst (3-round) w/ triggerCheck w/ resetOnTriggerRelease
+    //3
+    //true
+    //true
+  //mode that does not need to complete burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/ triggerCheck w/o resetOnTriggerRelease
+    //3
+    //true
+    //false
+  //mode that does not need to complete burst
+  //BUT will have less rounds on next trigger pull if not completed
+
+  //burst (3-round) w/o triggerCheck w/ resetOnTriggerRelease
+    //3
+    //false
+    //true
+  //mode that will complete all rounds in burst
+  //AND is reseted for each trigger pull
+
+  //burst (3-round) w/o triggerCheck w/o resetOnTriggerRelease*
+    //3
+    //false
+    //false
+  //mode that will complete all rounds in burst
+  //BUT will have less rounds on next trigger pull if not completed
+  //*needs to still be considered in case a full burst could not be performed
+  //(i.e. reload needed mid-burst)
+
+/*
+struct FireMode
+{
+  std::string modeName;
+  unsigned roundsPerPull;
+  bool triggerCheck;
+  bool resetOnTriggerRelease;
+}
+*/
+
+static FireMode semi("Semi-Auto", 1 ,false, true);
+static FireMode burst3("Burst 3", 3, true, true);
+static FireMode full("Full-Auto", 0, true, true);
 
 //Each weaponStage of the weaponComponent contain their unique firemode
 //that will affect the firemode of the weapComp_Action
@@ -333,11 +423,11 @@ struct weapComp_Action : public weaponComponent
   weapComp_Action(std::string name_) : weaponComponent(name_)
   {}
 
-  FireMode firemode;
+  FireMode firemode = semi;
 
   unsigned remainingRoundsPerPull; //once reached 0, end sequence
 
-  void activateComponent(bool activateNextComp = true) override;
+  //void activateComponent(bool activateNextComp = true) override;
 };
 
 #if 1
@@ -450,12 +540,12 @@ struct weapComp_Round : public weaponComponent
 
     if(round != nullptr)
     {
-      std::cout << "Activating round in " << name << std::endl;
+      std::cout << "Activating round in:     " << name << std::endl;
       returnVal = round->activateRound();
     }
     else
     {
-      std::cout << "No round to activate in " << name << std::endl;
+      std::cout << "No round to activate in: " << name << std::endl;
     }
 
     return returnVal;
@@ -570,35 +660,62 @@ struct weaponSystem
 {
     if(weapComp != nullptr)
     {
-      std::cout << "**Modding START**: " << weapComp->name << std::endl;
+      std::cout
+      << std::left << std::setw(32)
+      << "**Modding START**: "
+      << weapComp->name
+      << " "
+      << weapComp
+      << std::endl;
     }
     else
     {
-      std::cout << "**Modding START**: No weaponComp" << std::endl;
+      std::cout
+      << std::left << std::setw(32)
+      << "**Modding START**: "
+      << "No weaponComp"
+      << " "
+      << weapComp
+      << std::endl;
     }
 }
+//***DEBUG END***
 
     weapComp = rules();
 
-      //DEBUG: Need a way to have weapComp in modComp
-      //       correspond to its relatice data in parent->weapComps 
     if(weapComp != nullptr)
     {
       weapComp->parent = this;
-      weapComp->parent->weapComps[weaponSystem::MAGIZINE] = weapComp;
+
+        //TODO: Research a way to have 'weapComp' in modComp()
+        //      correspond to its relative data in parent->weapComps 
+      //weapComp->parent->weapComps[weaponSystem::MAGIZINE] = weapComp; //TEMP
     }
 
-//***DEBUG END***
+//**DEBUG START**
 {
     if(weapComp != nullptr)
     {
-      std::cout << "***Modding END***: " << weapComp->name << std::endl;
+      std::cout
+      << std::left << std::setw(32)
+      << "***Modding END***: "
+      << weapComp->name
+      << " "
+      << weapComp
+      << std::endl;
     }
     else
     {
-      std::cout << "***Modding END***: No weaponComp" << std::endl;
+      std::cout
+      << std::left << std::setw(32)
+      << "***Modding END***: "
+      << "No weaponComp"
+      << " "
+      << weapComp
+      << std::endl;
     }
 }
+//***DEBUG END***
   }
 
   enum WEAP_COMPS_ENUMS
@@ -642,7 +759,7 @@ struct weapComp_Port : public weaponComponent
   weapComp_Port(std::string name_) : weaponComponent(name_)
   {}
 
-  T *object = nullptr;
+  T *(*object) = nullptr;
   colliderConditional<T> cc;
 
   T* (*rulesForAdding)()   = nullptr;
@@ -650,41 +767,47 @@ struct weapComp_Port : public weaponComponent
 
   void addComp()
   {
-    parent->modComp<T>(object, rulesForAdding);
+    if(object != nullptr)
+    {
+      parent->modComp<T>((*object), rulesForAdding);
+    }
   }
 
   void removeComp()
   {
-    parent->modComp<T>(object, rulesForRemoving);
+    if(object != nullptr)
+    {
+      parent->modComp<T>((*object), rulesForRemoving);
+    }
   }
 
   bool IsObjectAttached()
   {
-    return object != nullptr;
+    return (*object) != nullptr;
   }
 
   bool IsObjectDisattached()
   {
-    return object == nullptr;
+    return (*object) == nullptr;
   }
 
-  void activateComponent(bool activateNextComp = true) override;
-  void readyComponent(bool activateNextComp = true) override;
+  //void activateComponent(bool activateNextComp = true) override;
+  //void readyComponent(bool activateNextComp = true) override;
 
 /* 
   void ReadyRound()
   {
-    if(object != nullptr)
+    if((*object) != nullptr)
     {
-      object->ReadyRound();
+      (*object)->ReadyRound();
     }
   }
 
   bool RoundTransferTo(weapComp_Round* dest)
   {
-    if(object != nullptr)
+    if((*object) != nullptr)
     {
-      return object->RoundTransferTo(dest);
+      return (*object)->RoundTransferTo(dest);
     }
 
     return true;
@@ -692,6 +815,8 @@ struct weapComp_Port : public weaponComponent
  */
 };
 
+//DEPRECATED
+#if 0
 void weapComp_Action::activateComponent(bool /* activateNextComp */)
 {
   std::cout << "Activating Action" << std::endl;
@@ -700,7 +825,7 @@ void weapComp_Action::activateComponent(bool /* activateNextComp */)
   {
     if(parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
     {
-      if(firemode.resetOnTriggerPull)
+      if(firemode.resetOnTriggerRelease)
       {
         remainingRoundsPerPull = firemode.roundsPerPull;
       }
@@ -715,7 +840,7 @@ void weapComp_Action::activateComponent(bool /* activateNextComp */)
     return;
   }
 
-//weaponComponent::activateComponent(false); //Cycles firing mode
+//weaponComponent::activateComponent(false);
 }
 
 template <typename T>
@@ -723,7 +848,7 @@ void weapComp_Port<T>::activateComponent(bool activateNextComp)
 {
   std::cout << "Activating Port" << std::endl;
 
-  //parent->modComp<weapComp_Port<T>>(object, rulesForAdding);
+  //parent->modComp<weapComp_Port<T>>((*object), rulesForAdding);
   //addComp();
 
 weaponComponent::activateComponent(activateNextComp);
@@ -734,15 +859,16 @@ void weapComp_Port<T>::readyComponent(bool readyNextComp)
 {
   std::cout << "Readying Port" << std::endl;
 
-  //parent->modComp<weapComp_Port<T>>(object, rulesForRemoving);
+  //parent->modComp<weapComp_Port<T>>((*object), rulesForRemoving);
   //removeComp();
 
 weaponComponent::activateComponent(readyNextComp);
 }
+#endif
 
 void weaponSystem::debug()
 {
-  std::cout << "**DEBUG START**" << std::endl;
+  std::cout << "\n**DEBUG START**" << std::endl;
 
   if(weapComps[weaponSystem::MAGIZINE] != nullptr)
   {
@@ -759,13 +885,17 @@ void weaponSystem::debug()
     << "N/A" << std::endl;
   }
 
-  if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(weapComps[weaponSystem::FEEDPORT])->object != nullptr)
+  if(
+     (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(
+       weapComps[weaponSystem::FEEDPORT])->object)
+     != nullptr
+    )
   {
     std::cout
     << std::left << std::setw(25)
     << "Name of Feedport object: "
-    << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(
-         weapComps[weaponSystem::FEEDPORT])->object->name
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(
+         weapComps[weaponSystem::FEEDPORT])->object)->name
     << std::endl;
   }
   else
@@ -776,7 +906,7 @@ void weaponSystem::debug()
     << "N/A" << std::endl;
   }
 
-  std::cout << "***DEBUG END***" << std::endl;
+  std::cout << "***DEBUG END***\n" << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -797,6 +927,56 @@ void weaponSystem::debug()
   }
 }
 */
+
+////////////////////////////////////////
+//Actioning:
+
+bool logic_actioning(struct weaponComponent* thisComp)
+{
+  std::cout << "Actioning" << std::endl;
+
+  weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
+
+  if(thisAction->firemode.triggerCheck)
+  {
+    if(thisAction->parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
+    {
+      if(thisAction->firemode.resetOnTriggerRelease)
+      {
+        thisAction->readyComponent();
+      }
+
+      return false;
+    }
+  }
+
+  if(thisAction->remainingRoundsPerPull == 0)
+  {
+    if(thisAction->firemode.roundsPerPull > 0) //i.e. not full auto
+    {
+      thisAction->readyComponent();
+      return false;
+    }
+  }
+
+  return true;
+
+//thisComp->activateComponent();
+}
+
+////////////////////////////////////////
+//Readying:
+
+bool logic_readying(struct weaponComponent* thisComp)
+{
+  std::cout << "Readying" << std::endl;
+
+  weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
+
+  thisAction->remainingRoundsPerPull = thisAction->firemode.roundsPerPull;
+
+  return true;
+}
 
 ////////////////////////////////////////
 //Opening:
@@ -845,11 +1025,11 @@ bool logic_feeding(struct weaponComponent* thisComp)
 }
 
 ////////////////////////////////////////
-//Cycling:
+//Cycling Out:
 
-bool logic_cycling(struct weaponComponent* thisComp)
+bool logic_cyclingExternally(struct weaponComponent* thisComp)
 {
-  std::cout << "Cycling" << std::endl;
+  std::cout << "Cycling Externally" << std::endl;
 
   reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
     reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])
@@ -874,24 +1054,47 @@ bool logic_loading(struct weaponComponent* thisComp)
 {
   if(thisComp->parent->weapComps[weaponSystem::MAGIZINE] != nullptr)
   {
-    std::cout << "**weapComps[MAGIZINE] START**: "
+    std::cout
+    << std::left << std::setw(32)
+    << "**weapComps[MAGIZINE] START**: "
     << thisComp->parent->weapComps[weaponSystem::MAGIZINE]->name
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
     << std::endl;
   }
   else
   {
-    std::cout << "**weapComps[MAGIZINE] START**: No weaponComp" << std::endl;
+    std::cout
+    << std::left << std::setw(32)
+    << "**weapComps[MAGIZINE] START**: "
+    << "No weaponComp"
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+    << std::endl;
   }
 
-  if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object != nullptr)
+  if(
+     (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+     != nullptr
+    )
   {
-    std::cout << "**logic_loading START**: "
-    << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object->name
+    std::cout
+    << std::left << std::setw(32)
+    << "**logic_loading START**: "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)->name
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
     << std::endl;
   }
   else
   {
-    std::cout << "**logic_loading START**: No weaponComp" << std::endl;
+    std::cout
+    << std::left << std::setw(32)
+    << "**logic_loading START**: "
+    << "No weaponComp"
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+    << std::endl;
   }
 }
 
@@ -899,26 +1102,49 @@ bool logic_loading(struct weaponComponent* thisComp)
 
 //***DEBUG END***
 {
-  if(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object != nullptr)
+  if(
+     (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+     != nullptr
+    )
   {
-    std::cout << "***logic_loading END***: "
-    << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object->name
+    std::cout
+    << std::left << std::setw(32)
+    << "***logic_loading END***: "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)->name
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
     << std::endl;
   }
   else
   {
-    std::cout << "***logic_loading END***: No weaponComp" << std::endl;
+    std::cout
+    << std::left << std::setw(32)
+    << "***logic_loading END***: "
+    << "No weaponComp"
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+    << std::endl;
   }
 
   if(thisComp->parent->weapComps[weaponSystem::MAGIZINE] != nullptr)
   {
-    std::cout << "***weapComps[MAGIZINE] END***: "
+    std::cout
+    << std::left << std::setw(32)
+    << "***weapComps[MAGIZINE] END***: "
     << thisComp->parent->weapComps[weaponSystem::MAGIZINE]->name
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
     << std::endl;
   }
   else
   {
-    std::cout << "***weapComps[MAGIZINE] END***: No weaponComp" << std::endl;
+    std::cout
+    << std::left << std::setw(32)
+    << "***weapComps[MAGIZINE] END***: "
+    << "No weaponComp"
+    << " "
+    << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->object)
+    << std::endl;
   }
 }
 
@@ -940,9 +1166,9 @@ bool logic_unloading(struct weaponComponent* thisComp)
 ////////////////////////////////////////
 //Readying
 
-bool logic_readying(struct weaponComponent* thisComp)
+bool logic_cyclingInternally(struct weaponComponent* thisComp)
 {
-  std::cout << "Readying" << std::endl;
+  std::cout << "Cycling Internally" << std::endl;
 
   reinterpret_cast<weapComp_Mag*>(thisComp)->ReadyRound();
 
@@ -1154,7 +1380,7 @@ bool logic_pulling(struct weaponComponent* thisComp)
 {
   std::cout << "Pulling" << std::endl;
 
-  if(reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerPull)
+  if(reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerRelease)
   {
     reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
       = reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
@@ -1172,91 +1398,6 @@ bool logic_releasing(struct weaponComponent* /* thisComp */)
   return true;
 }
 
-
-////////////////////////////////////////
-//Firemodes
-
-  //semi
-    //1
-    //false/true  (same difference)
-    //true /false (same difference)
-
-  //full
-    //0
-    //true /false (false means to keep firing until ammo in system is exhausted)
-    //true /false (same difference)
-
-  //burst (3-round) w/ triggerCheck w/ resetOnTriggerPull
-    //3
-    //true
-    //true
-  //mode that does not need to complete burst
-  //AND is reseted for each trigger pull
-
-  //burst (3-round) w/ triggerCheck w/o resetOnTriggerPull
-    //3
-    //true
-    //false
-  //mode that does not need to complete burst
-  //BUT will have less rounds on next trigger pull if not completed
-
-  //burst (3-round) w/o triggerCheck w/ resetOnTriggerPull
-    //3
-    //false
-    //true
-  //mode that will complete all rounds in burst
-  //AND is reseted for each trigger pull
-
-  //burst (3-round) w/o triggerCheck w/o resetOnTriggerPull*
-    //3
-    //false
-    //false
-  //mode that will complete all rounds in burst
-  //BUT will have less rounds on next trigger pull if not completed
-  //*needs to still be considered in case a full burst could not be performed
-  //(i.e. reload needed mid-burst)
-
-/*
-struct FireMode
-{
-  unsigned roundsPerPull;
-  bool triggerCheck;
-  bool resetOnTriggerPull;
-}
-*/
-
-bool firemode_semi(struct weaponComponent* thisComp)
-{
-  std::cout << "Mode Semi" << std::endl;
-
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 1;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = false;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
-
-  return true;
-}
-
-bool firemode_burst3(struct weaponComponent* thisComp)
-{
-  std::cout << "Mode Burst 3" << std::endl;
-
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 3;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = true;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
-
-  return true;
-}
-
-bool firemode_full(struct weaponComponent* thisComp)
-{
-  std::cout << "Mode Full" << std::endl;
-
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.roundsPerPull      = 0;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.triggerCheck       = true;
-  reinterpret_cast<weapComp_Action*>(thisComp)->firemode.resetOnTriggerPull = true;
-
-  return true;
-}
 
 ////////////////////////////////////////
 //Rules for adding/removing components
@@ -1305,10 +1446,10 @@ int main()
   detactableMag->roundsContained = basicRounds;
   gcc.reachableMag               = detactableMag;
 
-  //feedPort->cc.reachableMag      = gcc.reachableMag;
-  feedPort->cc                   = gcc;
-  feedPort->rulesForAdding       = rulesForAdding_Mag;
-  feedPort->rulesForRemoving     = rulesForRemoving_Mag;
+  FireModes firemodes;
+  firemodes.firemodes.push_back(semi);
+  firemodes.firemodes.push_back(burst3);
+  firemodes.firemodes.push_back(full);
 
 #if 0
   trigger->CompToActivate(hammer);
@@ -1375,9 +1516,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   weaponStage engaging(TD_ACTIVE);
 
     //Action: uses firemodes
-  weaponStage fm_semi(TD_EITHER);
-  weaponStage fm_burst3(TD_EITHER);
-  weaponStage fm_full(TD_EITHER);
+  weaponStage readying(TD_EITHER);
+  weaponStage actioning(TD_EITHER);
 
   //Feedport: ready when unloaded
   weaponStage unloading(TD_READY);
@@ -1396,8 +1536,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   weaponStage firing(TD_ACTIVE); //was in Round
 
   //Magizine: ready when round is ready for transfer
-  weaponStage readying(TD_READY);
-  weaponStage cycling(TD_ACTIVE);
+  weaponStage cyclingInternally(TD_READY);
+  weaponStage cyclingExternally(TD_ACTIVE);
 
     //Round
   //weaponStage priming(TD_READY); //Round
@@ -1414,9 +1554,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   engaging.activationStage   = logic_engaging;
 
     //Action
-  fm_semi.activationStage    = firemode_semi;
-  fm_burst3.activationStage  = firemode_burst3;
-  fm_full.activationStage    = firemode_full;
+  readying.activationStage   = logic_readying;
+  actioning.activationStage  = logic_actioning;
 
     //Feedport
   unloading.activationStage  = logic_unloading;
@@ -1435,8 +1574,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   firing.activationStage     = logic_firing; //was in Round
 
     //Magizine
-  readying.activationStage   = logic_readying;
-  cycling.activationStage    = logic_cycling;
+  cyclingInternally.activationStage   = logic_cyclingInternally;
+  cyclingExternally.activationStage   = logic_cyclingExternally;
 
     //Round
   //priming.activationStage    = logic_priming;
@@ -1453,9 +1592,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   hammer->weaponStages.push_back(engaging);
 
     //Action
-  action->weaponStages.push_back(fm_semi);
-  action->weaponStages.push_back(fm_burst3);
-  action->weaponStages.push_back(fm_full);
+  action->weaponStages.push_back(readying);
+  action->weaponStages.push_back(actioning);
 
     //Feedport
   feedPort->weaponStages.push_back(unloading);
@@ -1474,8 +1612,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   chamber->weaponStages.push_back(firing); //was in Round
 
     //Magizine
-  detactableMag->weaponStages.push_back(readying);
-  detactableMag->weaponStages.push_back(cycling);
+  detactableMag->weaponStages.push_back(cyclingInternally);
+  detactableMag->weaponStages.push_back(cyclingExternally);
 
     //Round
 
@@ -1496,9 +1634,39 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   rifleAuto.addWeapComp(chamber);  //CHAMBER,
   rifleAuto.addWeapComp(barrel);   //BARREL,
   rifleAuto.addWeapComp(muzzle);   //MUZZLE,
-  rifleAuto.addWeapComp(detactableMag);  //MAGIZINE,
+  rifleAuto.addWeapComp(nullptr);  //MAGIZINE,
 
-  weaponSystem curWeapon = rifleAuto;
+  feedPort->object               = reinterpret_cast<weapComp_Mag**>(&rifleAuto.weapComps[weaponSystem::MAGIZINE]);
+  (*feedPort->object)            = nullptr;
+  feedPort->cc                   = gcc;
+  feedPort->rulesForAdding       = rulesForAdding_Mag;
+  feedPort->rulesForRemoving     = rulesForRemoving_Mag;
+  //feedPort->cc.reachableMag      = gcc.reachableMag;
+
+  weaponSystem &curWeapon = rifleAuto;
+
+  std::cout << "\nDEBUGGING ADDRESSES" << std::endl;
+  
+  std::cout
+  << std::left
+  << std::setw(50)
+  << "&rifleAuto->weapComps[weaponSystem::MAGIZINE]: "
+  << &rifleAuto.weapComps[weaponSystem::MAGIZINE]
+  << std::endl;
+
+  std::cout
+  << std::left
+  << std::setw(50)
+  << "&curWeapon->weapComps[weaponSystem::MAGIZINE]: "
+  << &curWeapon.weapComps[weaponSystem::MAGIZINE]
+  << std::endl;
+
+  std::cout
+  << std::left
+  << std::setw(50)
+  << "feedPort->object : "
+  << feedPort->object 
+  << std::endl;
 
 //Debug
 {
@@ -1507,8 +1675,8 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   std::cout << "detactableMag name:              " << detactableMag->name << std::endl;
                                                  
   std::cout << "FEEDPORT->object->name:          ";
-  if(reinterpret_cast<weaponComponent*>(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object) != nullptr)
-  std::cout << reinterpret_cast<weaponComponent*>(reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object)->name << std::endl;
+  if((*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object) != nullptr)
+  std::cout << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object)->name << std::endl;
   else
   std::cout << "N/A" << std::endl;
 
@@ -1517,7 +1685,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   std::cout << reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->cc.reachableMag->name << std::endl;
   else
   std::cout << "N/A" << std::endl;
-  std::cout << "***DEBUG END***" << std::endl;
+  std::cout << "***DEBUG END***\n" << std::endl;
 
   //std::cout << "feedPort->cc.reachableMag name:    ";
   //if(feedPort->cc.reachableMag != nullptr)
@@ -1538,7 +1706,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   while(input != "q")
   {
     input.clear();
-    std::cout << "\nENTER COMMAND" << std::endl;
+    std::cout << "ENTER COMMAND" << std::endl;
     std::cin >> input;
 
 #if 1
@@ -1548,7 +1716,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
 
       curWeapon.debug();
 
-      if(curWeapon.weapComps[weaponSystem::MAGIZINE] == nullptr)//->object == nullptr)
+      if(curWeapon.weapComps[weaponSystem::MAGIZINE] == nullptr)//->(*object) == nullptr)
       {
         std::cout << "*No Magizine" << std::endl;
       }
@@ -1626,6 +1794,10 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
       //    }
       //  }
       //}
+    }
+    else if(input == "f") //FireModes
+    {
+      reinterpret_cast<weapComp_Action*>(curWeapon.weapComps[weaponSystem::ACTION])->firemode = firemodes.cycleFiremodes();
     }
     else if(input == "b") //Open Bolt
     {
