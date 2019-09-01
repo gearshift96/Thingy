@@ -202,7 +202,7 @@ struct weaponComponent
   }
 
     //function pointer; activates all active weaponStages
-  virtual void activateComponent(bool activateNextComp = true)
+  void activateComponent(bool activateNextComp = true)
   {
     std::cout << activateNextComp << " Activating " << name << ":" << std::endl;
 
@@ -210,7 +210,7 @@ struct weaponComponent
     {
       if(
          weaponStages[curStage].trigDirection == TD_ACTIVE
-         //|| weaponStages[curStage].trigDirection == TD_EITHER
+         || weaponStages[curStage].trigDirection == TD_EITHER
         )
       {
         if(weaponStages[curStage].activationStage(this))
@@ -273,7 +273,7 @@ if(activateNextComp)
 }
   }
 
-  virtual void readyComponent(bool readyNextComp = true)
+  void readyComponent(bool readyNextComp = true)
   {
     std::cout << readyNextComp << " Readying " << name << ":" << std::endl;
 
@@ -281,7 +281,7 @@ if(activateNextComp)
     {
       if(
          weaponStages[curStage].trigDirection == TD_READY
-         //|| weaponStages[curStage].trigDirection == TD_EITHER
+         || weaponStages[curStage].trigDirection == TD_EITHER
         )
       {
         if(weaponStages[curStage].activationStage(this))
@@ -503,7 +503,7 @@ struct weapComp_Round : public weaponComponent
       std::cout << "No round at destination" << std::endl;
     }
 
-    return false;
+    return true; //false; //TEMP
   }
 
     //TODO: Should rewrite logic to be RoundTransferFrom?
@@ -531,7 +531,7 @@ struct weapComp_Round : public weaponComponent
       std::cout << "No round at source" << std::endl;
     }
 
-    return false;
+    return true; //false; //TEMP
   }
 
   bool activateRound()
@@ -557,6 +557,18 @@ struct weapComp_Round : public weaponComponent
     RoundTransferTo(shouldTransferRoundTo);
   }
 */
+
+  void debug()
+  {
+    if(round == nullptr)
+    {
+      std::cout << "Round NOT there" << std::endl;
+    }
+    else
+    {
+      std::cout << "Round IS there" << std::endl;
+    }
+  }
 };
 
 struct weapComp_Mag : public weapComp_Round
@@ -567,8 +579,18 @@ struct weapComp_Mag : public weapComp_Round
   ws_round* roundsContained = nullptr;
   unsigned roundCount = defaultRoundCount;
 
+  void Reset()
+  {
+    std::cout << "Resetting: " << name << std::endl;
+
+    roundCount = defaultRoundCount;
+    readyComponent();
+  }
+
   void ReadyRound()
   {
+    std::cout << "Readying Round" << std::endl;
+
     if(round == nullptr)
     {
       if(roundCount > 0)
@@ -913,134 +935,168 @@ void weaponSystem::debug()
 //LOGIC
 //*optional; cases where state maybe unnecessary for
 //           the core functionality of the system
-#if 1
 
-//!Trigger Group (open): Activate at 'Feeding' stage
-//  -engageTrigger (run external logic)
-
-/*
-{
-    //trigger.activationState = 'Feeding'
-  if(state.current == trigger.activationState)
-  {
-    engageEntireTrigger();
-  }
-}
-*/
+//Trigger: ready when released
+  //releasing(TD_READY);
+  //pulling(TD_ACTIVE);
+//Hammer: ready when cocked
+  //cocking(TD_READY);
+  //engaging(TD_ACTIVE);
+//Action: uses firemodes
+  //readying(TD_EITHER);
+  //actioning(TD_EITHER);
+//Feedport: ready when unloaded
+  //unloading(TD_READY);
+  //loading(TD_ACTIVE);
+//Bolt: ready when opened
+  //opening(TD_READY);
+  //feeding(TD_ACTIVE);
+  //ejecting(TD_READY);
+  //chambing(TD_ACTIVE); //was in Chamber //take round from BOLT
+  //extracting(TD_READY);
+  //closing(TD_ACTIVE);
+//Chamber: ready when emptied
+  //emptying(TD_READY);
+  //firing(TD_ACTIVE); //was in Round
+//Magizine: ready when round is ready for transfer
+  //cyclingInternally(TD_READY);
+  //cyclingExternally(TD_ACTIVE);
 
 ////////////////////////////////////////
-//Actioning:
+//==TRIGGER==
+  //releasing(TD_READY);
+  //pulling(TD_ACTIVE);
 
-bool logic_actioning(struct weaponComponent* thisComp)
+//Pulling
+bool logic_pulling(struct weaponComponent* thisComp)
 {
-  std::cout << "Actioning" << std::endl;
+  std::cout << "Pulling" << std::endl;
+
+  if(reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerRelease)
+  {
+    reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
+      = reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
+  }
+
+  return true;
+}
+
+//Releasing
+bool logic_releasing(struct weaponComponent* /* thisComp */)
+{
+  std::cout << "Releasing" << std::endl;
+  return true;
+}
+
+////////////////////////////////////////
+//==HAMMER==
+  //cocking(TD_READY);
+  //engaging(TD_ACTIVE);
+
+//*Cocking
+//  -ready hammer (animation + sound)
+bool logic_cocking(struct weaponComponent* /* thisComp */)
+{
+/*
+  playAnimation(HammerPos<animation>(hammerPosFullCock));
+  playSound(HammerPos<sound>(hammerPosFullCock));
+
+  state.next();
+*/
+
+  std::cout << "Cocking" << std::endl;
+  return true;
+}
+
+//*Engaging
+//  -engage hammer (animation + sound)
+bool logic_engaging(struct weaponComponent* /* thisComp */)
+{
+  std::cout << "Engaging" << std::endl;
+  return true;
+}
+
+////////////////////////////////////////
+//==ACTION==
+  //readying(TD_EITHER);
+  //actioning(TD_EITHER);
+
+//Reacting:
+bool logic_reacting(struct weaponComponent* thisComp)
+{
+  std::cout << "Reacting" << std::endl;
 
   weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
 
+  thisAction->parent->weapComps[weaponSystem::BOLT]->activateComponent(false);
+
+/*
   if(thisAction->firemode.triggerCheck)
   {
     if(thisAction->parent->weapComps[weaponSystem::TRIGGER]->IsActive() == false)
     {
       if(thisAction->firemode.resetOnTriggerRelease)
       {
-        thisAction->readyComponent();
+        thisAction->remainingRoundsPerPull = thisAction->firemode.roundsPerPull;
       }
 
       return false;
     }
   }
+*/
+
+  if(thisAction->remainingRoundsPerPull > 0
+     || thisAction->firemode.roundsPerPull == 0) //i.e. is full auto
+  {
+    thisComp->activateComponent();
+    return false;
+  }
+  else
+  {
+    thisAction->parent->weapComps[weaponSystem::TRIGGER]->readyComponent();
+    return true;
+  }
+}
+
+//Actioning:
+bool logic_actioning(struct weaponComponent* thisComp)
+{
+  std::cout << "Actioning" << std::endl;
+
+  weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
 
   if(thisAction->remainingRoundsPerPull == 0)
   {
     if(thisAction->firemode.roundsPerPull > 0) //i.e. not full auto
     {
-      thisAction->readyComponent();
+      thisComp->readyComponent();
       return false;
     }
   }
+  else
+  {
+    --thisAction->remainingRoundsPerPull;
+  }
 
   return true;
-
-//thisComp->activateComponent();
 }
 
 ////////////////////////////////////////
-//Readying:
+//==FEEDPORT==
+  //unloading(TD_READY);
+  //loading(TD_ACTIVE);
 
-bool logic_readying(struct weaponComponent* thisComp)
+//Unloading:
+bool logic_unloading(struct weaponComponent* thisComp)
 {
-  std::cout << "Readying" << std::endl;
+  std::cout << "Unloading" << std::endl;
 
-  weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
-
-  thisAction->remainingRoundsPerPull = thisAction->firemode.roundsPerPull;
+  reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->removeComp();
 
   return true;
 }
 
-////////////////////////////////////////
-//Opening:
-
-bool logic_opening(struct weaponComponent* thisComp)
-{
-  std::cout << "Opening" << std::endl;
-
-  thisComp->parent->weapComps[weaponSystem::MAGIZINE]->readyComponent();
-
-  return true;
-}
-
-////////////////////////////////////////
-//Feeding:
-//  -bolt beginning to close (animation + sound)
-//  -transitionRoundFromMagToBolt (transfer of object)
-
-bool logic_feeding(struct weaponComponent* thisComp)
-{
-/*
-  animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
-  BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
-
-  playAnimation(boltAnimation);
-  playSound(BoltPos<sound>(boltPosFeeding));
-
-  //state.next(); //DEPRECATED
-*/
-
-  std::cout << "Feeding" << std::endl;
-
-/*
-  reinterpret_cast<weapComp_Round*>(thisComp)->
-    RoundTransferFrom
-    (
-      reinterpret_cast<weapComp_Round*>
-        (thisComp->parent->weapComps[weaponSystem::FEEDPORT])
-    );
-*/
-  //reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::FEEDPORT])->activateComponent();
-
-  thisComp->parent->weapComps[weaponSystem::MAGIZINE]->activateComponent();
-
-  return true;
-}
-
-////////////////////////////////////////
-//Cycling Out:
-
-bool logic_cyclingExternally(struct weaponComponent* thisComp)
-{
-  std::cout << "Cycling Externally" << std::endl;
-
-  reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
-    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])
-  );
-
-  return true;
-}
-
-////////////////////////////////////////
 //Loading:
-
 bool logic_loading(struct weaponComponent* thisComp)
 {
   std::cout << "Loading" << std::endl;
@@ -1152,169 +1208,52 @@ bool logic_loading(struct weaponComponent* thisComp)
 }
 
 ////////////////////////////////////////
-//Unloading:
+//==BOLT==
+  //opening(TD_READY);
+  //feeding(TD_ACTIVE);
+  //ejecting(TD_READY);
+  //chambing(TD_ACTIVE); //was in Chamber //take round from BOLT
+  //extracting(TD_READY);
+  //closing(TD_ACTIVE);
 
-bool logic_unloading(struct weaponComponent* thisComp)
+//Opening:
+bool logic_opening(struct weaponComponent* thisComp)
 {
-  std::cout << "Unloading" << std::endl;
+  std::cout << "Opening" << std::endl;
 
-  reinterpret_cast<weapComp_Port<weapComp_Mag>*>(thisComp)->removeComp();
+  thisComp->parent->weapComps[weaponSystem::MAGIZINE]->readyComponent();
 
   return true;
 }
 
-////////////////////////////////////////
-//Readying
-
-bool logic_cyclingInternally(struct weaponComponent* thisComp)
-{
-  std::cout << "Cycling Internally" << std::endl;
-
-  reinterpret_cast<weapComp_Mag*>(thisComp)->ReadyRound();
-
-  return true;
-}
-
-////////////////////////////////////////
-//Emptying:
-
-bool logic_emptying(struct weaponComponent* thisComp)
-{
-  std::cout << "Emptying" << std::endl;
-
-  return reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
-           reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])
-         );
-}
-
-////////////////////////////////////////
-//Chambering:
-//  -bolt finsihing to close (animation + sound)
-//  -transitionRoundFromBoltToChamber (transfer of object)
-
-bool logic_chambing(struct weaponComponent* thisComp)
+//Feeding:
+//  -bolt beginning to close (animation + sound)
+//  -transitionRoundFromMagToBolt (transfer of object)
+bool logic_feeding(struct weaponComponent* thisComp)
 {
 /*
-  animation* boltAnimation = BoltPos<animation>(boltPosChambering);
-  BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
+  animation* boltAnimation = BoltPos<animation>(boltPosFeeding);
+  BindEvent(boltAnimation, END, transitionRoundFromMagToBolt);
 
   playAnimation(boltAnimation);
-  playSound(BoltPos<sound>(boltPosChambering));
+  playSound(BoltPos<sound>(boltPosFeeding));
 
   //state.next(); //DEPRECATED
 */
 
-  std::cout << "Chambing" << std::endl;
+  std::cout << "Feeding" << std::endl;
 
-  return reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferFrom(
-           reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT])
-         );
-}
+  reinterpret_cast<weapComp_Round*>(thisComp)->debug(); //DEBUG
 
-////////////////////////////////////////
-//*Locking:
-//  -*ensuring bolt is closed (logic check)
-//  -locking bolt (animation + sound)
+  thisComp->parent->weapComps[weaponSystem::MAGIZINE]->activateComponent();
 
-/*
-{
-    //float distanceForLocking - 
-  if(bolt.distanceFromClosed() < bolt.distanceForLocking)
-  {
-    playAnimation(BoltPos<animation>(boltPosLocking));
-    playSound(BoltPos<sound>(boltPosLocking));
-
-    state.next();
-  }
-}
-*/
-
-////////////////////////////////////////
-//!Trigger Group (close): Activate at 'Firing' stage
-//  -engageTrigger (run external logic)
-
-/*
-{
-    //trigger.activationState = 'Firing'
-  if(state.current == trigger.activationState)
-  {
-    engageEntireTrigger();
-  }
-}
-*/
-
-////////////////////////////////////////
-//Firing:
-//  -*engage hammer (animation + sound)
-//  -activateRoundInChamber (activate external system)
-//  -if successful: continue
-//  -else: don't continue
-
-bool logic_firing(struct weaponComponent* thisComp)
-{
-/*
-  playAnimation(HammerPos<animation>(hammerPosEngaged));
-  playSound(HammerPos<sound>(hammerPosEngaged));
-
-  //DEPRECATED
-  //if(activateRoundInChamber())
-  //{
-  //  state.next(); //SetState("Firing", AFTER);
-  //}
-*/
-
-  std::cout << "Firing" << std::endl;
-
-  bool returnVale = false;
-
-  if(reinterpret_cast<weapComp_Round*>(thisComp)->round != nullptr)
-  {
-    returnVale = reinterpret_cast<weapComp_Round*>(thisComp)->round->activateRound();
-  }
-
-  return returnVale;
-}
-
-////////////////////////////////////////
-//*Unlocking
-//  -unlocking bolt (animation + sound)
-
-/*
-{
-  playAnimation(BoltPos<animation>(boltPosChambering));
-  playSound(BoltPos<sound>(boltPosChambering));
-
-  state.next();
-}
-*/
-
-////////////////////////////////////////
-//Extracting:
-//  -transitionRound(Remains)FromChamberToBolt (transfer of object)
-
-bool logic_extracting(struct weaponComponent* thisComp)
-{
-/*
-  animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
-  BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
-
-  playAnimation(boltAnimation);
-  playSound(BoltPos<sound>(boltPosExtracting));
-
-  //state.next(); //DEPRECATED
-*/
-
-  std::cout << "Extracting" << std::endl;
-
-  thisComp->parent->weapComps[weaponSystem::CHAMBER]->readyComponent();
+  reinterpret_cast<weapComp_Round*>(thisComp)->debug(); //DEBUG
 
   return true;
 }
 
-////////////////////////////////////////
 //Ejecting:
 //  -ejectRoundFromBolt (sound + particle effects + spawning object)
-
 bool logic_ejecting(struct weaponComponent* thisComp)
 {
 /*
@@ -1337,9 +1276,53 @@ bool logic_ejecting(struct weaponComponent* thisComp)
   return true;
 }
 
-////////////////////////////////////////
-//Closing
+//Chambering:
+//  -bolt finsihing to close (animation + sound)
+//  -transitionRoundFromBoltToChamber (transfer of object)
+bool logic_chambing(struct weaponComponent* thisComp)
+{
+/*
+  animation* boltAnimation = BoltPos<animation>(boltPosChambering);
+  BindEvent(boltAnimation, END, transitionRoundFromBoltToChamber);
 
+  playAnimation(boltAnimation);
+  playSound(BoltPos<sound>(boltPosChambering));
+
+  //state.next(); //DEPRECATED
+*/
+
+  std::cout << "Chambing" << std::endl;
+
+  bool returnVal = reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
+    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::CHAMBER]));
+
+  returnVal = true; //DESIRED_EFFECT
+
+  return returnVal;
+}
+
+//Extracting:
+//  -transitionRound(Remains)FromChamberToBolt (transfer of object)
+bool logic_extracting(struct weaponComponent* thisComp)
+{
+/*
+  animation* boltAnimation = BoltPos<animation>(boltPosExtracting);
+  BindEvent(boltAnimation, END, transitionRoundFromChamberToBolt);
+
+  playAnimation(boltAnimation);
+  playSound(BoltPos<sound>(boltPosExtracting));
+
+  //state.next(); //DEPRECATED
+*/
+
+  std::cout << "Extracting" << std::endl;
+
+  thisComp->parent->weapComps[weaponSystem::CHAMBER]->readyComponent(false); //?
+
+  return true;
+}
+
+//Closing
 bool logic_closing(struct weaponComponent* /* thisComp */)
 {
   std::cout << "Closing" << std::endl;
@@ -1347,59 +1330,88 @@ bool logic_closing(struct weaponComponent* /* thisComp */)
 }
 
 ////////////////////////////////////////
-//*Cocking
-//  -ready hammer (animation + sound)
+//==CHAMBER==
+  //emptying(TD_READY);
+  //firing(TD_ACTIVE); //was in Round
 
-bool logic_cocking(struct weaponComponent* /* thisComp */)
+//Emptying:
+bool logic_emptying(struct weaponComponent* thisComp)
+{
+  std::cout << "Emptying" << std::endl;
+
+  bool returnVal= reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
+    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT]));
+
+  returnVal = true; //DESIRED_EFFECT
+
+  return returnVal;
+}
+
+//Firing:
+//  -*engage hammer (animation + sound)
+//  -activateRoundInChamber (activate external system)
+//  -if successful: continue
+//  -else: don't continue
+bool logic_firing(struct weaponComponent* thisComp)
 {
 /*
-  playAnimation(HammerPos<animation>(hammerPosFullCock));
-  playSound(HammerPos<sound>(hammerPosFullCock));
+  playAnimation(HammerPos<animation>(hammerPosEngaged));
+  playSound(HammerPos<sound>(hammerPosEngaged));
 
-  state.next();
+  //DEPRECATED
+  //if(activateRoundInChamber())
+  //{
+  //  state.next(); //SetState("Firing", AFTER);
+  //}
 */
 
-  std::cout << "Cocking" << std::endl;
-  return true;
-}
+  std::cout << "Firing" << std::endl;
 
-////////////////////////////////////////
-//*Engaging
-//  -engage hammer (animation + sound)
+  bool returnVale = false;
 
-bool logic_engaging(struct weaponComponent* /* thisComp */)
-{
-  std::cout << "Engaging" << std::endl;
-  return true;
-}
-
-////////////////////////////////////////
-//Pulling
-
-bool logic_pulling(struct weaponComponent* thisComp)
-{
-  std::cout << "Pulling" << std::endl;
-
-  if(reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.resetOnTriggerRelease)
+  if(reinterpret_cast<weapComp_Round*>(thisComp)->round != nullptr)
   {
-    reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->remainingRoundsPerPull
-      = reinterpret_cast<weapComp_Action*>(thisComp->parent->weapComps[weaponSystem::ACTION])->firemode.roundsPerPull;
+    returnVale = reinterpret_cast<weapComp_Round*>(thisComp)->round->activateRound();
   }
 
-  return true;
+  thisComp->parent->weapComps[weaponSystem::BOLT]->readyComponent();
+
+  return returnVale;
 }
 
 ////////////////////////////////////////
-//Releasing
+//==MAGIZINE==
+  //cyclingInternally(TD_READY);
+  //cyclingExternally(TD_ACTIVE);
 
-bool logic_releasing(struct weaponComponent* /* thisComp */)
+//Cycling Internally:
+bool logic_cyclingInternally(struct weaponComponent* thisComp)
 {
-  std::cout << "Releasing" << std::endl;
+  std::cout << "Cycling Internally" << std::endl;
+
+  reinterpret_cast<weapComp_Mag*>(thisComp)->ReadyRound();
+
   return true;
 }
 
+//Cycling Externally:
+bool logic_cyclingExternally(struct weaponComponent* thisComp)
+{
+  std::cout << "Cycling Externally" << std::endl;
 
-////////////////////////////////////////
+  reinterpret_cast<weapComp_Round*>(thisComp)->debug(); //DEBUG
+
+  bool returnVal = reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
+    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponSystem::BOLT]));
+
+  reinterpret_cast<weapComp_Round*>(thisComp)->debug(); //DEBUG
+
+  returnVal = true;
+
+  return returnVal;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //Rules for adding/removing components
 
 weapComp_Mag* rulesForAdding_Mag()
@@ -1413,8 +1425,6 @@ weapComp_Mag* rulesForRemoving_Mag()
   std::cout << "Applying rule for removing magizine" << std::endl;
   return nullptr;
 }
-
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //LOGIC EXECUTION
@@ -1444,6 +1454,7 @@ int main()
   ws_round* basicRounds       = new ws_round;
 
   detactableMag->roundsContained = basicRounds;
+  detactableMag->Reset();
   gcc.reachableMag               = detactableMag;
 
   FireModes firemodes;
@@ -1516,15 +1527,15 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   weaponStage engaging(TD_ACTIVE);
 
     //Action: uses firemodes
-  weaponStage readying(TD_EITHER);
-  weaponStage actioning(TD_EITHER);
+  weaponStage reacting(TD_READY);
+  weaponStage actioning(TD_ACTIVE);
 
   //Feedport: ready when unloaded
   weaponStage unloading(TD_READY);
   weaponStage loading(TD_ACTIVE);
 
     //Bolt:   ready when opened
-  weaponStage opening(TD_READY);
+  weaponStage opening(TD_EITHER);
   weaponStage feeding(TD_ACTIVE);
   weaponStage ejecting(TD_READY);
   weaponStage chambing(TD_ACTIVE); //was in Chamber //take round from BOLT
@@ -1536,7 +1547,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   weaponStage firing(TD_ACTIVE); //was in Round
 
   //Magizine: ready when round is ready for transfer
-  weaponStage cyclingInternally(TD_READY);
+  weaponStage cyclingInternally(TD_EITHER);
   weaponStage cyclingExternally(TD_ACTIVE);
 
     //Round
@@ -1554,7 +1565,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   engaging.activationStage   = logic_engaging;
 
     //Action
-  readying.activationStage   = logic_readying;
+  reacting.activationStage   = logic_reacting;
   actioning.activationStage  = logic_actioning;
 
     //Feedport
@@ -1592,7 +1603,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   hammer->weaponStages.push_back(engaging);
 
     //Action
-  action->weaponStages.push_back(readying);
+  action->weaponStages.push_back(reacting);
   action->weaponStages.push_back(actioning);
 
     //Feedport
@@ -1646,7 +1657,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   weaponSystem &curWeapon = rifleAuto;
 
   std::cout << "\nDEBUGGING ADDRESSES" << std::endl;
-  
+
   std::cout
   << std::left
   << std::setw(50)
@@ -1673,7 +1684,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   std::cout << "\n**DEBUG START**" << std::endl;
   std::cout << "gcc.reachableMag name:           " << gcc.reachableMag->name << std::endl;
   std::cout << "detactableMag name:              " << detactableMag->name << std::endl;
-                                                 
+
   std::cout << "FEEDPORT->object->name:          ";
   if((*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object) != nullptr)
   std::cout << (*reinterpret_cast<weapComp_Port<weapComp_Mag>*>(curWeapon.weapComps[weaponSystem::FEEDPORT])->object)->name << std::endl;
@@ -1686,20 +1697,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   else
   std::cout << "N/A" << std::endl;
   std::cout << "***DEBUG END***\n" << std::endl;
-
-  //std::cout << "feedPort->cc.reachableMag name:    ";
-  //if(feedPort->cc.reachableMag != nullptr)
-  //std::cout << feedPort->cc.reachableMag->name << std::endl;
-  //else
-  //std::cout << "N/A" << std::endl;
 }
-
-    //Configure weapon to desired presets
-  //action->readyComponent(false);
-  //hammer->readyComponent(false);
-//std::cout << "Bolt status BEFORE: " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
-  //bolt->activateComponent(false);
-//std::cout << "Bolt status AFTER:  " << std::boolalpha << bolt->IsActive() << std::noboolalpha << std::endl;
 
   std::string input;
 
@@ -1753,20 +1751,20 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
 
       if(shouldReload == true)
       {
+          //Setting Bolt Open
         if(curWeapon.weapComps[weaponSystem::BOLT]->IsReady() == false)
         {
           curWeapon.weapComps[weaponSystem::BOLT]->readyComponent(false);
         }
 
+        //curWeapon.debug(); //DEBUG
+
         std::cout << "*Inserting Magizine" << std::endl;
-        detactableMag->roundCount = defaultRoundCount;
-
-        curWeapon.debug();
-
+        detactableMag->Reset();
         curWeapon.weapComps[weaponSystem::FEEDPORT]->activateComponent(false);
         curWeapon.weapComps[weaponSystem::BOLT]->activateComponent(false);
 
-        curWeapon.debug();
+        //curWeapon.debug(); //DEBUG
       }
       else
       {
@@ -1797,14 +1795,20 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
     }
     else if(input == "f") //FireModes
     {
+      std::cout << "INPUT FireModes:" << std::endl;
+
       reinterpret_cast<weapComp_Action*>(curWeapon.weapComps[weaponSystem::ACTION])->firemode = firemodes.cycleFiremodes();
     }
     else if(input == "b") //Open Bolt
     {
+      std::cout << "INPUT Open Bolt:" << std::endl;
+
       curWeapon.weapComps[weaponSystem::BOLT]->readyComponent(false);
     }
     else if(input == "n") //Close Bolt
     {
+      std::cout << "INPUT Close Bolt:" << std::endl;
+
       curWeapon.weapComps[weaponSystem::BOLT]->activateComponent(false);
     }
 #endif
