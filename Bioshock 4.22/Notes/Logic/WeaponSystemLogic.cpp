@@ -209,6 +209,7 @@ private:
   }
 };
 
+//TODO: Reposition to end of DATA STRUCTURES
 struct weaponSystem
 {
   weaponSystem(std::string name_) : name(name_)
@@ -229,6 +230,8 @@ struct weaponSystem
       weapComp->parent = this;
     }
   }
+
+  unsigned weaponRoundCount();
 
 //private:
   std::vector<weaponComponent*> weapComps;
@@ -738,7 +741,7 @@ struct weapComp_Round : public weaponComponent
     return roundActivated;
   }
 
-  void debug()
+  virtual void debug() override
   {
     weaponComponent::debug();
 
@@ -833,7 +836,7 @@ struct weapComp_Mag : public weapComp_Round
     }
   }
 
-  void debug()
+  void debug() override
   {
     weapComp_Round::debug();
 
@@ -850,8 +853,9 @@ struct weapComp_Mag : public weapComp_Round
     {
       std::cout
       << "*"
+      << "Rounds in Magizine: "
       << magRoundCount()
-      << " Rounds in Magizine out of: "
+      << " out of "
       << magMaxCapacity()
       << std::endl;
     }      
@@ -927,7 +931,7 @@ struct weapComp_Port : public weaponComponent
     return (*object) == nullptr;
   }
 
-  void debug()
+  void debug() override
   {
     weaponComponent::debug();
 
@@ -971,6 +975,45 @@ void weaponSystem::debug()
   }
 
   std::cout << "***DEBUG END: weaponSystem***" << std::endl;
+}
+
+unsigned weaponSystem::weaponRoundCount()
+{
+  unsigned roundCountTotal = 0;
+
+  if (reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::MAGIZINE]) == nullptr)
+  {
+    //std::cout << "*No Magizine" << std::endl;
+  }
+  else
+  {
+    //reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::MAGIZINE])->debug();
+    roundCountTotal += reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::MAGIZINE])->magRoundCount();
+  }
+
+    //HACK
+  if (reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::CHAMBER]) == nullptr)
+  {
+    //std::cout << "*No Chamber" << std::endl;
+  }
+  else
+  {
+    //reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::CHAMBER])->debug();
+    roundCountTotal += reinterpret_cast<weapComp_Round*>(weapComps[weaponComponent::CHAMBER])->HasRound();
+  }
+
+  //HACK
+  if (reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::BOLT]) == nullptr)
+  {
+    //std::cout << "*No Bolt" << std::endl;
+  }
+  else
+  {
+    //reinterpret_cast<weapComp_Mag*>(weapComps[weaponComponent::BOLT])->debug();
+    roundCountTotal += reinterpret_cast<weapComp_Round*>(weapComps[weaponComponent::BOLT])->HasRound();
+  }
+
+  return roundCountTotal;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1540,7 +1583,7 @@ std::cout << "\n**Initializing Weapons: START**" << std::endl;
 
     //chamber->CompToReady(bolt, TD_ACTIVE);
     bolt->CompToReady(hammer, TD_EITHER);
-    hammer->CompToReady(action, TD_ACTIVE);
+    hammer->CompToReady(action, TD_EITHER);
     action->CompToReady(trigger, TD_EITHER);
   }
 
@@ -1715,20 +1758,13 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
     std::cout << "\nENTER COMMAND: ";
     std::cin >> input;
 
-    if(input == "t") //Check Mag
+    if(input == "t") //Check weapon count
     {
       std::cout << "STATUS[Ammo check]" << std::endl;
 
-      //TODO: Move following logic to their respective debug()
+      unsigned roundCount = curWeapon.weaponRoundCount();
 
-      if(curWeapon.weapComps[weaponComponent::MAGIZINE] == nullptr)
-      {
-        std::cout << "*No Magizine" << std::endl;
-      }
-      else
-      {
-        curWeapon.weapComps[weaponComponent::MAGIZINE]->debug();
-      }
+      std::cout << "*Rounds in system in all: " << roundCount << std::endl;
     }
     else if(input == "r") //Reload
     {
