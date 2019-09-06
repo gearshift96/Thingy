@@ -212,7 +212,9 @@ private:
 struct weaponSystem
 {
   weaponSystem(std::string name_) : name(name_)
-  {}
+  {
+    weapComps.reserve(weaponComponent::COUNT);
+  }
 
   std::string name;
 
@@ -234,12 +236,21 @@ struct weaponSystem
   std::queue<setCompInfo> setCompQueue;
 
 public:
-  void addWeapComp(weaponComponent* weapComp)
+  template<typename T>
+  void addWeapComp(T weapComp)
   {
-    weapComps.push_back(weapComp);
+//std::cout << "typeid(T).name(): " << typeid(T).name() << std::endl; //DEBUG
+
+    if(typeid(T) == typeid(struct weapComp_Port*))
+    {
+      std::cout << "!!!typeid(T) == typeid(weapComp_Port*)" << std::endl;
+    }
+
+    //weapComps.push_back(weapComp);
 
     if(weapComp != nullptr)
     {
+      weapComps[weapComp->wcType] = weapComp;
       weapComp->parent = this;
     }
   }
@@ -466,19 +477,19 @@ struct FireMode
 {
   FireMode
   (
-    std::string modeName_,
+    std::string name_,
     unsigned roundsPerPull_,
     bool triggerCheck_,
     bool resetOnTriggerRelease_
   )
-  : modeName(modeName_)
+  : name(name_)
   , roundsPerPull(roundsPerPull_)
   , triggerCheck(triggerCheck_)
   , resetOnTriggerRelease(resetOnTriggerRelease_)
 
   {}
 
-  std::string modeName;
+  std::string name;
   unsigned roundsPerPull; //0 implies full auto //infinity in a place of zero
   bool triggerCheck; //to check if trigger is activie before continuing on sequence
   bool resetOnTriggerRelease; //if(remainingRoundsPerPull == 0){/*reset anyway*/}
@@ -492,6 +503,12 @@ struct FireModes
   FireMode cycleFiremodes()
   {
     FireMode firemodeToReturn = firemodes[++curFiremode];
+
+    std::cout << "*Changing fire modes: "
+    << firemodes[curFiremode - 1].name
+    << " -> "
+    << firemodes[curFiremode].name
+    << std::endl;
 
     if(curFiremode == firemodes.size())
     {
@@ -1572,7 +1589,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
   rifleAuto.addWeapComp(chamber);  //CHAMBER,
   rifleAuto.addWeapComp(barrel);   //BARREL,
   rifleAuto.addWeapComp(muzzle);   //MUZZLE,
-  rifleAuto.addWeapComp(nullptr);  //MAGIZINE,
+  //rifleAuto.addWeapComp(nullptr);  //MAGIZINE,
 
   feedPort->object =
     reinterpret_cast<weapComp_Mag**>(
@@ -1661,9 +1678,9 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
       std::cout << "ACTION[Cycle FireModes]" << std::endl;
 
       //WIP
-      //reinterpret_cast<weapComp_Action*>(
-      //  curWeapon.weapComps[weaponComponent::ACTION])->firemode
-      //= firemodes.cycleFiremodes();
+      reinterpret_cast<weapComp_Action*>(
+        curWeapon.weapComps[weaponComponent::ACTION])->firemode
+      = firemodes.cycleFiremodes();
     }
     else if(input == "b") //Open Bolt
     {
@@ -1706,6 +1723,10 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
           std::cout << "*This WeapSys is missing WeapComp type of: " << i << std::endl;
         }
       }
+    }
+    else
+    {
+      std::cout << "UNKNOWN COMMAND" << std::endl;
     }
   }
 
