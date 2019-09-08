@@ -737,20 +737,26 @@ struct weapComp_Round : public weaponComponent
 
         return true;
       }
-      else
+      else //JAM
       {
         std::cout
         << std::left << std::setw(26)
-        << "*Round already at source: "
+        << "*Round already at destination: "
         << source->name
         << std::endl;
       }
     }
     else
     {
+      //TODO: return HasRound();
+//NOTE: This seperation of return logic allows for callers to create
+//      defined behavior depending on whether a weapComp (srce & dest equally)
+//      started with a round or not before making this function call 
+
+
       std::cout
       << std::left << std::setw(26)
-      << "*No round at destination: "
+      << "*No round at source: "
       << name
       << std::endl;
     }
@@ -758,12 +764,13 @@ struct weapComp_Round : public weaponComponent
     return false; //TEMP
   }
 
-    //TODO: Should rewrite logic to be RoundTransferFrom?
+    //TODO: Should rewrite logic to combine
+    //      RoundTransferFrom and RoundTransferTo?
   bool RoundTransferTo(weapComp_Round* dest)
   {
     if(round != nullptr)
     {
-      if (dest == nullptr)
+      if (dest == nullptr) //?
       {
         delete round;
         round = nullptr;
@@ -784,7 +791,7 @@ struct weapComp_Round : public weaponComponent
 
         return true;
       }
-      else
+      else //JAM
       {
         std::cout
         << std::left << std::setw(26)
@@ -795,6 +802,11 @@ struct weapComp_Round : public weaponComponent
     }
     else
     {
+      //TODO: return dest->HasRound();
+//NOTE: This seperation of return logic allows for callers to create
+//      defined behavior depending on whether a weapComp (srce & dest equally)
+//      started with a round or not before making this function call 
+
       std::cout
       << std::left << std::setw(26)
       << "*No round at source"
