@@ -39,7 +39,7 @@ struct weaponStage
   //float rateOfChangeFactor; //SUSPENDED //rate at which to APPROACH this stage
   triggerDirection trigDirection;
   bool (*activationStage)(struct weaponComponent* thisComp); //function pointer
-  unsigned rateOfFire;
+  //unsigned rateOfFire;
 
     // changeInPos / time(seconds)
   //void rateOfPosChangeFixed(float);    //SUSPENDED
@@ -67,6 +67,45 @@ struct weaponComponent
     MAGIZINE, //8
     COUNT     //COUNT
   };
+
+  friend std::ostream& operator<<(std::ostream& os, WEAP_COMPS_ENUMS key)
+  {
+    switch(key)
+    {
+      case(weaponComponent::TRIGGER):
+        os << "TRIGGER";
+        break;
+      case(weaponComponent::HAMMER):
+        os << "HAMMER";
+        break;
+      case(weaponComponent::ACTION):
+        os << "ACTION";
+        break;
+      case(weaponComponent::FEEDPORT):
+        os << "FEEDPORT";
+        break;
+      case(weaponComponent::BOLT):
+        os << "BOLT";
+        break;
+      case(weaponComponent::CHAMBER):
+        os << "CHAMBER";
+        break;
+      case(weaponComponent::BARREL):
+        os << "BARREL";
+        break;
+      case(weaponComponent::MUZZLE):
+        os << "MUZZLE";
+        break;
+      case(weaponComponent::MAGIZINE):
+        os << "MAGIZINE";
+        break;
+      default:
+        os << "UNKNOWN";
+        break;
+    }
+
+    return os;
+  }
 
   weaponComponent(std::string name_, WEAP_COMPS_ENUMS wcType_)
   : name(name_), wcType(wcType_)
@@ -220,8 +259,8 @@ struct weaponSystem
 
   std::string name;
 
-  template <typename T>
-  void modComp(T*& weapComp, T* (*rules)())
+  void modComp(weaponComponent*& weapComp,
+               weaponComponent* (*rules)())
   {
     weapComp = rules();
 
@@ -238,6 +277,7 @@ struct weaponSystem
   typedef std::pair<triggerDirection,
           weaponComponent::WEAP_COMPS_ENUMS> setCompInfo;
   std::queue<setCompInfo> setCompQueue;
+  unsigned roundCyclesFired = 0;
 
 public:
   void addWeapComp(weaponComponent* weapComp);
@@ -247,6 +287,18 @@ public:
   void setComponent(triggerDirection condition,
                     weaponComponent::WEAP_COMPS_ENUMS key)
   {
+    bool countCycle = false;
+
+    {
+      std::cout << "@Setting " << key << " to ";
+
+      if(condition == TD_ACTIVE)
+        std::cout << "ACTIVE" << std::endl;
+
+      if(condition == TD_READY)
+        std::cout << "READY" << std::endl;
+    }
+
     if(setCompQueue.empty() == false)
     {
       setCompQueue.push(std::make_pair(condition, key));
@@ -261,10 +313,29 @@ public:
 
       if(curComp.first == TD_READY)
       {
+          //NOTE: Goal to distinguish between each completed cycle in auto fire
+        if(countCycle && curComp.second == weaponComponent::ACTION)
+        {
+          std::cout << "Completed Round Cycle: "
+          << ++roundCyclesFired << std::endl;
+        }
+
         readyComponent(curComp.second);
       }
       else if(curComp.first == TD_ACTIVE)
       {
+          //NOTE: Goal to distinguish between each completed cycle in auto fire
+        if(curComp.second == weaponComponent::ACTION)
+        {
+          if(countCycle == false)
+          {
+            roundCyclesFired = 0;
+            countCycle = true;
+          }
+          std::cout << "\nFiring Round Cycle: "
+          << (roundCyclesFired + 1) << std::endl;
+        }
+
         activateComponent(curComp.second);
       }
 
@@ -312,7 +383,7 @@ public:
         weaponComponent*& nextComp = weapComps[key]->compToActivate;
 
         std::cout
-        << "*SUCCESS: "
+        << "***SUCCESS: "
         << thisComp->name
         << " ACTIVATED"
         << std::endl;
@@ -393,7 +464,7 @@ public:
         weaponComponent*& nextComp = weapComps[key]->compToReady;
 
         std::cout
-        << "*SUCCESS: "
+        << "***SUCCESS: "
         << thisComp->name
         << " READIED"
         << std::endl;
@@ -489,20 +560,30 @@ struct FireModes
 
   FireMode cycleFiremodes()
   {
-    FireMode firemodeToReturn = firemodes[++curFiremode];
+    unsigned lastFireMode = curFiremode;
 
-    std::cout << "*Changing fire modes: "
-    << firemodes[curFiremode - 1].name
-    << " -> "
-    << firemodes[curFiremode].name
-    << std::endl;
+    ++curFiremode;
 
     if(curFiremode == firemodes.size())
     {
       curFiremode = 0;
     }
 
+    FireMode firemodeToReturn = firemodes[curFiremode];
+
+    std::cout << "*Changing fire modes: "
+    << firemodes[lastFireMode].name
+    << " -> "
+    << firemodes[curFiremode].name
+    << std::endl;
+
     return firemodeToReturn;
+  }
+
+  void debug()
+  {
+    std::cout << "*Current fire mode: "
+    << firemodes[curFiremode].name << std::endl;
   }
 };
 
@@ -909,7 +990,7 @@ struct weapComp_Port : public weaponComponent
   {
     if(object != nullptr)
     {
-      parent->modComp<weaponComponent>((*object), rulesForAdding);
+      parent->modComp((*object), rulesForAdding);
     }
   }
 
@@ -917,7 +998,7 @@ struct weapComp_Port : public weaponComponent
   {
     if(object != nullptr)
     {
-      parent->modComp<weaponComponent>((*object), rulesForRemoving);
+      parent->modComp((*object), rulesForRemoving);
     }
   }
 
@@ -1125,18 +1206,25 @@ bool logic_reacting(struct weaponComponent* thisComp)
 
   weapComp_Action* thisAction = reinterpret_cast<weapComp_Action*>(thisComp);
 
-  thisAction->parent->setComponent(TD_ACTIVE, weaponComponent::BOLT);
-
   //TODO: Add logic for proposition thisAction->firemode.triggerCheck
+
+  if(thisAction->firemode.triggerCheck &&
+     thisComp->parent->weapComps[weaponComponent::TRIGGER]->IsActive() == false)
+  {
+    std::cout << "*Trigger is not active" << std::endl;
+    return true;
+  }
+
+  thisAction->parent->setComponent(TD_ACTIVE, weaponComponent::BOLT);
 
   if(thisAction->remainingRoundsPerPull > 0
      || thisAction->firemode.roundsPerPull == 0) //i.e. is full auto
   {
     thisComp->parent->setComponent(TD_ACTIVE, thisComp->wcType);
     std::cout << "*Re-Actioning" << std::endl;
-    return false;
+    //return false; //EXPERIMENTAL
   }
-  else
+  //else //EXPERIMENTAL
   {
       //TODO: can set as CompToReady
     //thisAction->parent->setComponent(TD_READY, weaponComponent::TRIGGER);
@@ -1378,7 +1466,10 @@ bool logic_firing(struct weaponComponent* thisComp)
   //if(reinterpret_cast<weapComp_Round*>(thisComp)->round != nullptr)
   {
     roundActivated = reinterpret_cast<weapComp_Round*>(thisComp)->activateRound();
+  }
 
+  if(roundActivated)
+  {
     //thisComp->parent->weapComps[weaponSystem::BOLT]->readyComponent();
     thisComp->parent->setComponent(TD_READY, weaponComponent::BOLT);
   }
@@ -1584,7 +1675,7 @@ std::cout << "\n**Initializing Weapons: START**" << std::endl;
     //chamber->CompToReady(bolt, TD_ACTIVE);
     bolt->CompToReady(hammer, TD_EITHER);
     hammer->CompToReady(action, TD_EITHER);
-    action->CompToReady(trigger, TD_EITHER);
+    //action->CompToReady(trigger, TD_EITHER);
   }
 
 #else
@@ -1806,18 +1897,45 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
         std::cout << "*Reloading Cancelled" << std::endl;
       }
     }
-    else if(input == "f") //Fire Weapon
+    else if(input == "f") //Fire Weapon; per trigger pull
     {
-      std::cout << "ACTION[Firing]" << std::endl;
+      std::cout << "ACTION[Firing]; Number of trigger pulls: ";
 
-      curWeapon.setComponent(TD_ACTIVE, weaponComponent::TRIGGER);
-      curWeapon.setComponent(TD_READY, weaponComponent::TRIGGER);
+      unsigned triggerPulls = 1;
+
+      std::cin >> triggerPulls;
+
+      for(unsigned i = 0; i < triggerPulls; ++i)
+      {
+        curWeapon.setComponent(TD_ACTIVE, weaponComponent::TRIGGER);
+        curWeapon.setComponent(TD_READY, weaponComponent::TRIGGER);
+      }
+    }
+    else if(input == "c") //Fire Weapon; per rounds fired
+    {
+      std::cout << "ACTION[Firing]; Number of rounds to fire: ";
+
+      unsigned roundsToFire = 1;
+
+      std::cin >> roundsToFire;
+
+      unsigned i = 0;
+
+      while(i < roundsToFire)
+      {
+        curWeapon.setComponent(TD_ACTIVE, weaponComponent::TRIGGER);
+        curWeapon.setComponent(TD_READY, weaponComponent::TRIGGER);
+
+        i += curWeapon.roundCyclesFired;
+
+std::cout << "\ni: " << i << "\n" << std::endl;
+      }
     }
     else if(input == "e") //FireModes
     {
       std::cout << "ACTION[Cycle FireModes]" << std::endl;
 
-      //WIP
+      //WIP; action should hold this info
       reinterpret_cast<weapComp_Action*>(
         curWeapon.weapComps[weaponComponent::ACTION])->firemode
       = firemodes.cycleFiremodes();
@@ -1842,6 +1960,7 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
       << curWeapon.name << "]"
       << std::endl;
       curWeapon.debug();
+      firemodes.debug();
     }
     else if(input == "s") //status of firearm
     {
