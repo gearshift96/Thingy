@@ -701,6 +701,15 @@ struct weapComp_Round : public weaponComponent
   : weaponComponent(name_, wcType_)
   {}
 
+  void DestoryRound()
+  {
+    if(HasRound())
+    {
+      delete round;
+      round = nullptr;
+    }
+  }
+
   bool HasRound()
   {
     return round != nullptr;
@@ -709,16 +718,112 @@ struct weapComp_Round : public weaponComponent
   //TODO: Clean up logic for round transferring; refactor into common helper functions
   bool RoundTransferFrom(weaponComponent::WEAP_COMPS_ENUMS key)
   {
-    return RoundTransferFrom(
-      reinterpret_cast<weapComp_Round*>(parent->weapComps[key]));
+    return
+#if 0
+      RoundTransferFrom(
+        reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
+#else
+      RoundTransfer(
+        reinterpret_cast<weapComp_Round*>(parent->weapComps[key]), this
+#endif
+
+      );
   }
 
   bool RoundTransferTo(weaponComponent::WEAP_COMPS_ENUMS key)
   {
-    return RoundTransferTo(
-      reinterpret_cast<weapComp_Round*>(parent->weapComps[key]));
+    return
+#if 0
+      RoundTransferTo(
+        reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
+#else
+      RoundTransfer(
+        this, reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
+#endif
+      );
   }
 
+  static bool RoundTransfer(weapComp_Round* srce, weapComp_Round* dest)
+  {
+    if(srce->HasRound())
+    {
+      std::cout
+      << std::left << std::setw(26)
+      << "*Round at source: "
+      << srce->name
+      << std::endl;
+
+      if(dest->HasRound()) //JAM
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*Round already at destination: "
+        << dest->name
+        << std::endl;
+
+        std::cout << "!Weapon Jam" << std::endl;
+
+        return false;
+      }
+      else
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*No round at destination: "
+        << dest->name
+        << std::endl;
+
+        std::cout
+        << std::left << std::setw(26)
+        << "*Transferring round: "
+        << srce->name
+        << " -> "
+        << dest->name
+        << std::endl;
+
+        //USE std::move
+        dest->round = srce->round;
+        srce->round = nullptr;
+
+        return true;
+      }
+    }
+    else
+    {
+      std::cout
+      << std::left << std::setw(26)
+      << "*No round at source: "
+      << srce->name
+      << std::endl;
+
+//NOTE: This seperation of return logic allows for callers to create
+//      defined behavior depending on whether a weapComp (srce & dest equally)
+//      started with a round or not before making this function call 
+      if(dest->HasRound())
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*Round already at destination: "
+        << dest->name
+        << std::endl;
+
+        return true;
+      }
+      else
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*No round at destination: "
+        << dest->name
+        << std::endl;
+
+        return false;
+      }
+    }
+  }
+
+//DEPRECATED: Replaced by RoundTransfer
+#if 0
   bool RoundTransferFrom(weapComp_Round* source)
   {
     if(source->round != nullptr)
@@ -816,6 +921,7 @@ struct weapComp_Round : public weaponComponent
 
     return false; //TEMP
   }
+#endif
 
   bool activateRound()
   {
@@ -1050,7 +1156,12 @@ void weaponSystem::debug()
 {
   std::cout << "**DEBUG START: weaponSystem**" << std::endl;
 
-  for(unsigned i = 0; i < weaponComponent::COUNT; ++i)
+  for(
+      weaponComponent::WEAP_COMPS_ENUMS i
+        = static_cast<weaponComponent::WEAP_COMPS_ENUMS>(0);
+      i < weaponComponent::COUNT;
+      i = weaponComponent::WEAP_COMPS_ENUMS(static_cast<int>(i) + 1)
+     )
   {
     if(weapComps[i] != nullptr)
     {
@@ -1372,7 +1483,10 @@ bool logic_ejecting(struct weaponComponent* thisComp)
     )
   {
     reinterpret_cast<weapComp_Round*>(
-      thisComp->parent->weapComps[weaponComponent::BOLT])->RoundTransferTo(nullptr);
+       thisComp->parent->weapComps[weaponComponent::BOLT])->DestoryRound();
+
+    //reinterpret_cast<weapComp_Round*>(
+    //  thisComp->parent->weapComps[weaponComponent::BOLT])->RoundTransferTo(nullptr);
   }
 
   return true;
@@ -1394,7 +1508,8 @@ bool logic_chambing(struct weaponComponent* thisComp)
   std::cout << "Chambing" << std::endl;
 
   bool returnVal = reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
-    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponComponent::CHAMBER]));
+    weaponComponent::CHAMBER);
+    //reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponComponent::CHAMBER]));
 
   //TEMP: forcing success
   if (returnVal == false)
@@ -1447,7 +1562,8 @@ bool logic_emptying(struct weaponComponent* thisComp)
   std::cout << "Emptying" << std::endl;
 
   bool returnVal= reinterpret_cast<weapComp_Round*>(thisComp)->RoundTransferTo(
-    reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponComponent::BOLT]));
+    weaponComponent::BOLT);
+    //reinterpret_cast<weapComp_Round*>(thisComp->parent->weapComps[weaponComponent::BOLT]));
 
   //TEMP: forcing success
   if (returnVal == false)
