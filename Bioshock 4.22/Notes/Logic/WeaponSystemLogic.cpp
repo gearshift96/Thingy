@@ -272,14 +272,20 @@ struct weaponSystem
 
   unsigned weaponRoundCount();
 
-//private:
+private:
   std::vector<weaponComponent*> weapComps;
   typedef std::pair<triggerDirection,
           weaponComponent::WEAP_COMPS_ENUMS> setCompInfo;
   std::queue<setCompInfo> setCompQueue;
+public:
   unsigned roundCyclesFired = 0;
 
 public:
+  weaponComponent*& getWeapComp(weaponComponent::WEAP_COMPS_ENUMS key)
+  {
+    return weapComps[key];
+  }
+
   void addWeapComp(weaponComponent* weapComp);
 
   //TODO: removeWeapComp
@@ -367,11 +373,13 @@ public:
 
 //private: //TEMP: DISABLED FOR DEVELOPMENT
 
-  //TODO: Give weapComp default weaponStages of Ready & Active
-  //      These stages won't have user defined logic (i.e. script),
-  //      but rather set logic to call a defined weapComp
-  //      or weaponStage (set to either ready or active).
-  //      Can still be set to nothing (e.g. compToActivate = nullptr)
+  //RESEARCH: Give weapComp default weaponStages of Ready & Active
+  //          These stages won't have user defined logic (i.e. script),
+  //          but rather set logic to call a defined weapComp
+  //          or weaponStage (set to either ready or active).
+  //          Can still be set to nothing (e.g. compToActivate = nullptr)
+//TODO: Combine logic of 'activateComponent'
+//      and 'readyComponent' into single logic call
   bool activateComponent(weaponComponent::WEAP_COMPS_ENUMS key)
   {
     weaponComponent*& thisComp = weapComps[key];
@@ -719,60 +727,73 @@ struct weapComp_Round : public weaponComponent
   bool RoundTransferFrom(weaponComponent::WEAP_COMPS_ENUMS key)
   {
     return
-#if 0
-      RoundTransferFrom(
-        reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
-#else
       RoundTransfer(
-        reinterpret_cast<weapComp_Round*>(parent->weapComps[key]), this
-#endif
-
+        reinterpret_cast<weapComp_Round*>(parent->getWeapComp(key)), this
       );
   }
 
   bool RoundTransferTo(weaponComponent::WEAP_COMPS_ENUMS key)
   {
     return
-#if 0
-      RoundTransferTo(
-        reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
-#else
       RoundTransfer(
-        this, reinterpret_cast<weapComp_Round*>(parent->weapComps[key])
-#endif
+        this, reinterpret_cast<weapComp_Round*>(parent->getWeapComp(key))
       );
   }
 
   static bool RoundTransfer(weapComp_Round* srce, weapComp_Round* dest)
   {
-    if(srce->HasRound())
+//NOTE: This seperation of return logic allows for callers to create
+//      defined behavior depending on whether a weapComp (srce & dest equally)
+//      started with a round or not before making this function call 
+    bool srceHasRound = srce->HasRound();
+    bool destHasRound = dest->HasRound();
+
+//**DEBUG START**
+    if(srceHasRound)
     {
       std::cout
       << std::left << std::setw(26)
       << "*Round at source: "
       << srce->name
       << std::endl;
+    }
+    else
+    {
+      std::cout
+      << std::left << std::setw(26)
+      << "*No round at source: "
+      << srce->name
+      << std::endl;
+    }
 
-      if(dest->HasRound()) //JAM
+    if(destHasRound)
+    {
+      std::cout
+      << std::left << std::setw(26)
+      << "*Round already at destination: "
+      << dest->name
+      << std::endl;
+    }
+    else
+    {
+      std::cout
+      << std::left << std::setw(26)
+      << "*No round at destination: "
+      << dest->name
+      << std::endl;
+    }
+//***DEBUG END***
+
+    if(srceHasRound)
+    {
+      if(destHasRound) //JAM
       {
-        std::cout
-        << std::left << std::setw(26)
-        << "*Round already at destination: "
-        << dest->name
-        << std::endl;
-
         std::cout << "!Weapon Jam" << std::endl;
 
         return false;
       }
-      else
+      else //if(!destHasRound) //TRANSFERRING
       {
-        std::cout
-        << std::left << std::setw(26)
-        << "*No round at destination: "
-        << dest->name
-        << std::endl;
-
         std::cout
         << std::left << std::setw(26)
         << "*Transferring round: "
@@ -788,35 +809,14 @@ struct weapComp_Round : public weaponComponent
         return true;
       }
     }
-    else
+    else //if(!srceHasRound)
     {
-      std::cout
-      << std::left << std::setw(26)
-      << "*No round at source: "
-      << srce->name
-      << std::endl;
-
-//NOTE: This seperation of return logic allows for callers to create
-//      defined behavior depending on whether a weapComp (srce & dest equally)
-//      started with a round or not before making this function call 
-      if(dest->HasRound())
+      if(destHasRound) //NOTHING, but round at source
       {
-        std::cout
-        << std::left << std::setw(26)
-        << "*Round already at destination: "
-        << dest->name
-        << std::endl;
-
         return true;
       }
-      else
+      else //if(!destHasRound) //NOTHING
       {
-        std::cout
-        << std::left << std::setw(26)
-        << "*No round at destination: "
-        << dest->name
-        << std::endl;
-
         return false;
       }
     }
@@ -1262,12 +1262,12 @@ bool logic_pulling(struct weaponComponent* thisComp)
   std::cout << "Pulling" << std::endl;
 
   if(reinterpret_cast<weapComp_Action*>(
-      thisComp->parent->weapComps[weaponComponent::ACTION])->firemode.resetOnTriggerRelease)
+      thisComp->parent->getWeapComp(weaponComponent::ACTION))->firemode.resetOnTriggerRelease)
   {
     reinterpret_cast<weapComp_Action*>(
-      thisComp->parent->weapComps[weaponComponent::ACTION])->remainingRoundsPerPull
+      thisComp->parent->getWeapComp(weaponComponent::ACTION))->remainingRoundsPerPull
       = reinterpret_cast<weapComp_Action*>(
-          thisComp->parent->weapComps[weaponComponent::ACTION])->firemode.roundsPerPull;
+          thisComp->parent->getWeapComp(weaponComponent::ACTION))->firemode.roundsPerPull;
   }
 
   return true;
@@ -1308,7 +1308,7 @@ bool logic_engaging(struct weaponComponent* thisComp)
 {
   std::cout << "Engaging" << std::endl;
 
-  if(thisComp->parent->weapComps[weaponComponent::BOLT]->IsActive() == false)
+  if(thisComp->parent->getWeapComp(weaponComponent::BOLT)->IsActive() == false)
   {
     std::cout << "*Bolt is not activated" << std::endl;
     return false;
@@ -1332,7 +1332,7 @@ bool logic_reacting(struct weaponComponent* thisComp)
   //TODO: Add logic for proposition thisAction->firemode.triggerCheck
 
   if(thisAction->firemode.triggerCheck &&
-     thisComp->parent->weapComps[weaponComponent::TRIGGER]->IsActive() == false)
+     thisComp->parent->getWeapComp(weaponComponent::TRIGGER)->IsActive() == false)
   {
     std::cout << "*Trigger is not active" << std::endl;
     return true;
@@ -1479,11 +1479,11 @@ bool logic_ejecting(struct weaponComponent* thisComp)
 
   if(
      reinterpret_cast<weapComp_Round*>(
-       thisComp->parent->weapComps[weaponComponent::BOLT])->HasRound()
+       thisComp->parent->getWeapComp(weaponComponent::BOLT))->HasRound()
     )
   {
     reinterpret_cast<weapComp_Round*>(
-       thisComp->parent->weapComps[weaponComponent::BOLT])->DestoryRound();
+       thisComp->parent->getWeapComp(weaponComponent::BOLT))->DestoryRound();
 
     //reinterpret_cast<weapComp_Round*>(
     //  thisComp->parent->weapComps[weaponComponent::BOLT])->RoundTransferTo(nullptr);
@@ -1715,10 +1715,10 @@ void weaponSystem::addWeapComp(weaponComponent* weapComp)
 
 void weapComp_Port::connectComp()
 {
-  object = &parent->weapComps[weapCompAttacheType];
+  object = &parent->getWeapComp(weapCompAttacheType);
   (*object) = nullptr;
   //cc = gcc;
-  rulesForAdding = rulesForAdding_Mag;
+  rulesForAdding   = rulesForAdding_Mag;
   rulesForRemoving = rulesForRemoving_Mag;
   ////feedPort->cc.reachableMag      = gcc.reachableMag;
 }
@@ -1992,10 +1992,10 @@ std::cout << "***Initializing Weapons: END***" << std::endl;
       bool shouldReload = true;
 
         //If weapon already has magizine
-      if(curWeapon.weapComps[weaponComponent::MAGIZINE])
+      if(curWeapon.getWeapComp(weaponComponent::MAGIZINE))
       {
         if(reinterpret_cast<weapComp_Mag*>(
-             curWeapon.weapComps[weaponComponent::MAGIZINE])->IsFull())
+             curWeapon.getWeapComp(weaponComponent::MAGIZINE))->IsFull())
         {
           shouldReload = false;
         }
@@ -2065,7 +2065,7 @@ std::cout << "\ni: " << i << "\n" << std::endl;
 
       //WIP; action should hold this info
       reinterpret_cast<weapComp_Action*>(
-        curWeapon.weapComps[weaponComponent::ACTION])->firemode
+        curWeapon.getWeapComp(weaponComponent::ACTION))->firemode
       = firemodes.cycleFiremodes();
     }
     else if(input == "b") //Open Bolt
@@ -2098,11 +2098,16 @@ std::cout << "\ni: " << i << "\n" << std::endl;
       << curWeapon.name << "]"
       << std::endl;
 
-      for(unsigned i = 0; i < weaponComponent::COUNT; ++i)
+      for(
+          weaponComponent::WEAP_COMPS_ENUMS i
+            = static_cast<weaponComponent::WEAP_COMPS_ENUMS>(0);
+          i < weaponComponent::COUNT;
+          i = weaponComponent::WEAP_COMPS_ENUMS(static_cast<int>(i) + 1)
+         )
       {
-        if(curWeapon.weapComps[i] != nullptr)
+        if(curWeapon.getWeapComp(i) != nullptr)
         {
-          curWeapon.weapComps[i]->weaponComponent::debug();
+          curWeapon.getWeapComp(i)->weaponComponent::debug();
         }
         else
         {
