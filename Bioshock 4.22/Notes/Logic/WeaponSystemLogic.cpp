@@ -202,12 +202,14 @@ private:
 
     while(curStage < weaponStages.size() + 1)
     {
+      unsigned curStageMod = curStage - 1;
+
       if(
-         weaponStages[curStage - 1].trigDirection == TD_ACTIVE
-         || weaponStages[curStage - 1].trigDirection == TD_EITHER
+         weaponStages[curStageMod].trigDirection == TD_ACTIVE
+         || weaponStages[curStageMod].trigDirection == TD_EITHER
         )
       {
-        if(weaponStages[curStage - 1].activationStage(this) == false)
+        if(weaponStages[curStageMod].activationStage(this) == false)
         {
           return false;
         }
@@ -230,12 +232,14 @@ private:
 
     while(curStage > 0)
     {
+      unsigned curStageMod = curStage - 1;
+
       if(
-         weaponStages[curStage - 1].trigDirection == TD_READY
-         || weaponStages[curStage - 1].trigDirection == TD_EITHER
+         weaponStages[curStageMod].trigDirection == TD_READY
+         || weaponStages[curStageMod].trigDirection == TD_EITHER
         )
       {
-        if(weaponStages[curStage - 1].activationStage(this) == false)
+        if(weaponStages[curStageMod].activationStage(this) == false)
         {
           return false;
         }
@@ -709,6 +713,7 @@ struct weapComp_Round : public weaponComponent
   : weaponComponent(name_, wcType_)
   {}
 
+  //RENAME: DestroyRound
   void DestoryRound()
   {
     if(HasRound())
@@ -749,38 +754,40 @@ struct weapComp_Round : public weaponComponent
     bool destHasRound = dest->HasRound();
 
 //**DEBUG START**
-    if(srceHasRound)
     {
-      std::cout
-      << std::left << std::setw(26)
-      << "*Round at source: "
-      << srce->name
-      << std::endl;
-    }
-    else
-    {
-      std::cout
-      << std::left << std::setw(26)
-      << "*No round at source: "
-      << srce->name
-      << std::endl;
-    }
+      if(srceHasRound)
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*Round at source: "
+        << srce->name
+        << std::endl;
+      }
+      else
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*No round at source: "
+        << srce->name
+        << std::endl;
+      }
 
-    if(destHasRound)
-    {
-      std::cout
-      << std::left << std::setw(26)
-      << "*Round already at destination: "
-      << dest->name
-      << std::endl;
-    }
-    else
-    {
-      std::cout
-      << std::left << std::setw(26)
-      << "*No round at destination: "
-      << dest->name
-      << std::endl;
+      if(destHasRound)
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*Round already at destination: "
+        << dest->name
+        << std::endl;
+      }
+      else
+      {
+        std::cout
+        << std::left << std::setw(26)
+        << "*No round at destination: "
+        << dest->name
+        << std::endl;
+      }
     }
 //***DEBUG END***
 
@@ -927,7 +934,7 @@ struct weapComp_Round : public weaponComponent
   {
     bool roundActivated = false;
 
-    if(round != nullptr)
+    if(HasRound())
     {
       std::cout << "*Activating round in:     " << name << std::endl;
       roundActivated = round->activateRound();
@@ -967,14 +974,15 @@ struct weapComp_Mag : public weapComp_Round
   weapComp_Mag(std::string name_, WEAP_COMPS_ENUMS wcType_, unsigned maxRoundCount_)
   : weapComp_Round(name_, wcType_), maxRoundCount(maxRoundCount_)
   {
-    //ReadyRound();
   }
+
+  ws_round roundToSet; //DEBUG
 
   unsigned magRoundCount()
   {
     unsigned roundCountTotal = roundCount;
 
-    if(round != nullptr)
+    if(HasRound())
     {
       ++roundCountTotal;
     }
@@ -1003,35 +1011,47 @@ struct weapComp_Mag : public weapComp_Round
 
     roundCount = maxRoundCount;
 
-    if(round == nullptr)
+    if(HasRound() == false)
     {
-      --roundCount;
-      round = new ws_round;
-      //roundCount = 1; //TEMP
-      //ReadyRound();
+      SetRoundInternally();
     }
   }
 
-  void ReadyRound()
+  bool ReadyRound()
   {
     std::cout << "Readying Round" << std::endl;
 
-    if(round == nullptr)
+    bool hasInternalRound = HasRound();
+    bool hasReserveRounds = (roundCount > 0);
+
+    if(hasInternalRound)
     {
-      if(roundCount > 0)
+      std::cout << "*Round already set to ready" << std::endl;
+
+      if(hasReserveRounds)
       {
-        std::cout << "*A round has been set to ready" << std::endl;
-        --roundCount;
-        round = new ws_round;
+        std::cout << "*More Rounds Ready" << std::endl;
+        return false;
       }
       else
       {
-        std::cout << "*No more rounds to set to ready" << std::endl;
+        std::cout << "*Last round in Mag" << std::endl;
+        return true;
       }
     }
     else
     {
-      std::cout << "*Round already set to ready" << std::endl;
+      if(hasReserveRounds)
+      {
+        std::cout << "*Setting round to ready" << std::endl;
+        SetRoundInternally();
+        return true;
+      }
+      else
+      {
+        std::cout << "*Magizine empty" << std::endl;
+        return false;
+      }
     }
   }
 
@@ -1058,6 +1078,13 @@ struct weapComp_Mag : public weapComp_Round
       << magMaxCapacity()
       << std::endl;
     }      
+  }
+
+private:
+  void SetRoundInternally()
+  {
+    --roundCount;
+    round = new ws_round;
   }
 
 private:
