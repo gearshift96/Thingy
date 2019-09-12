@@ -58,3 +58,6 @@ echo f
 echo 1
 echo q
 ) | WeaponSystemLogic.exe
+REM Allow for way to comment out 'q' and to have the batch cease running
+REM GOAL: Have batch run desired commands so testing can be done at
+REM       the point where the script leaves off 
