@@ -255,6 +255,21 @@ private:
   }
 };
 
+struct modCompCondtional
+{
+  modCompCondtional(weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType_)
+  : weapCompAttacheType(weapCompAttacheType_)
+  {}
+
+  //modCompCondtional(const modCompCondtional & other)
+  //: weapCompAttacheType(other.weapCompAttacheType)
+  //{}
+
+  const weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType;
+  virtual weaponComponent* rulesForAdding() = 0;
+  virtual bool rulesForRemoving() = 0;
+};
+
 //TODO: Reposition to end of DATA STRUCTURES
 struct weaponSystem
 {
@@ -266,27 +281,37 @@ struct weaponSystem
 
   std::string name;
 
-  void modComp(weaponComponent::WEAP_COMPS_ENUMS type,
-               weaponComponent* (*rules)())
+  void addWeapComp(modCompCondtional *modCompCond)
   {
-    weaponComponent* weapComp = rules();
+    weaponComponent* weapComp = modCompCond->rulesForAdding();
 
     if(weapComp != nullptr)
     {
       addWeapComp(weapComp);
     }
-    else
-    {
-      removeWeapComp(type);
-    }
-
-    //weapComp = rules();
-
-    //if(weapComp != nullptr)
-    //{
-    //  weapComp->parent = this;
-    //}
   }
+
+  void removeWeapComp(modCompCondtional *modCompCond)
+  {
+    if(modCompCond->rulesForRemoving())
+    {
+      removeWeapComp(modCompCond->weapCompAttacheType);
+    }
+  }
+
+  //DEPRECATED
+#if 0
+  void modComp(weaponComponent*& weapComp,
+               weaponComponent* (*rules)())
+  {
+    weapComp = rules();
+
+    if(weapComp != nullptr)
+    {
+      weapComp->parent = this;
+    }
+  }
+#endif
 
   unsigned weaponRoundCount();
 
@@ -1132,6 +1157,7 @@ private:
   unsigned maxRoundCount = 1;
 };
 
+//DEPRECATED
 #if 0
 struct colliderConditional
 {
@@ -1154,51 +1180,51 @@ static colliderConditional gcc;
 struct weapComp_Port : public weaponComponent
 {
   weapComp_Port(
-                std::string name_,
-                WEAP_COMPS_ENUMS wcType_,
-                WEAP_COMPS_ENUMS weapCompAttach_
-               )
-  : weaponComponent(name_, wcType_)
-  , weapCompAttacheType(weapCompAttach_)
+    std::string name_,
+    WEAP_COMPS_ENUMS wcType_,
+    modCompCondtional *modCompCond_
+  )
+    : weaponComponent(name_, wcType_)
+    , modCompCond(modCompCond_)
   {}
+
+  //weapComp_Port(const weapComp_Port& other)
+  //  : weaponComponent(other.name, other.wcType)
+  //  , modCompCond(other.modCompCond)
+  //{}
 
   virtual ~weapComp_Port(){}
 
-  const weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType;
+  modCompCondtional *modCompCond;
+
+    //MOVED: To modCompCondtional
+  //const weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType;
   //weaponComponent **object = nullptr;
   //colliderConditional cc;
 
-  weaponComponent* (*rulesForAdding)()   = nullptr;
-  weaponComponent* (*rulesForRemoving)() = nullptr;
+  //weaponComponent* (*rulesForAdding)()   = nullptr;
+  //weaponComponent* (*rulesForRemoving)() = nullptr;
 
   void connectComp();
 
   void addComp()
   {
-    //if(parent->getWeapComp(weapCompAttacheType) != nullptr)
-    //{
-      parent->modComp(weapCompAttacheType, /* parent->getWeapComp(weapCompAttacheType),  */
-                      rulesForAdding);
-    //}
+    parent->addWeapComp(modCompCond);
   }
 
   void removeComp()
   {
-    //if(object != nullptr)
-    //{
-      parent->modComp(weapCompAttacheType, /* parent->getWeapComp(weapCompAttacheType),  */
-                      rulesForRemoving);
-    //}
+    parent->removeWeapComp(modCompCond);
   }
 
   bool IsObjectAttached()
   {
-    return parent->getWeapComp(weapCompAttacheType) != nullptr;
+    return parent->getWeapComp(modCompCond->weapCompAttacheType) != nullptr;
   }
 
   bool IsObjectDisattached()
   {
-    return parent->getWeapComp(weapCompAttacheType) == nullptr;
+    return parent->getWeapComp(modCompCond->weapCompAttacheType) == nullptr;
   }
 
   void debug() override
@@ -1207,11 +1233,11 @@ struct weapComp_Port : public weaponComponent
 
     //std::cout << "*DEBUG START weapComp_Port*" << std::endl;
 
-    if(/* object != nullptr && */ parent->getWeapComp(weapCompAttacheType) != nullptr)
+    if(parent->getWeapComp(modCompCond->weapCompAttacheType) != nullptr)
     {
       std::cout << "*Object is attached" << std::endl;
 
-      parent->getWeapComp(weapCompAttacheType)->debug();
+      parent->getWeapComp(modCompCond->weapCompAttacheType)->debug();
     }
     else
     {
@@ -1729,34 +1755,39 @@ bool logic_cyclingExternally(struct weaponComponent* thisComp)
 //weapComp_Mag* reachableMag
 //  = new weapComp_Mag("Magizine", weaponComponent::MAGIZINE, 10);
 
-weaponComponent* rulesForAdding_Mag()
+struct modCompCond_Mag : public modCompCondtional
 {
-  std::cout << "Applying rule for adding magizine" << std::endl;
-  //reachableMag->Reset();
-  //return reachableMag;
+  modCompCond_Mag() : modCompCondtional(weaponComponent::MAGIZINE){}
 
-  weapComp_Mag* reachableMag
-    = new weapComp_Mag("Magizine", weaponComponent::MAGIZINE, 10);
+  weaponComponent* rulesForAdding() override
+  {
+    std::cout << "Applying rule for adding magizine" << std::endl;
+    //reachableMag->Reset();
+    //return reachableMag;
 
-  reachableMag->Reset();
+    weapComp_Mag* reachableMag
+      = new weapComp_Mag("Magizine", weaponComponent::MAGIZINE, 10);
 
-  weaponStage cyclingInternally(TD_READY);//(TD_EITHER);
-  weaponStage cyclingExternally(TD_ACTIVE);
+    reachableMag->Reset();
 
-  cyclingInternally.activationStage = logic_cyclingInternally;
-  cyclingExternally.activationStage = logic_cyclingExternally;
+    weaponStage cyclingInternally(TD_READY);//(TD_EITHER);
+    weaponStage cyclingExternally(TD_ACTIVE);
 
-  reachableMag->weaponStages.push_back(cyclingInternally);
-  reachableMag->weaponStages.push_back(cyclingExternally);
+    cyclingInternally.activationStage = logic_cyclingInternally;
+    cyclingExternally.activationStage = logic_cyclingExternally;
 
-  return reachableMag;
-}
+    reachableMag->weaponStages.push_back(cyclingInternally);
+    reachableMag->weaponStages.push_back(cyclingExternally);
 
-weaponComponent* rulesForRemoving_Mag()
-{
-  std::cout << "Applying rule for removing magizine" << std::endl;
-  return nullptr;
-}
+    return reachableMag;
+  }
+
+  bool rulesForRemoving() override
+  {
+    std::cout << "Applying rule for removing magizine" << std::endl;
+    return true;
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 //Function Definitions
@@ -1792,8 +1823,8 @@ void weapComp_Port::connectComp()
   //object = &parent->getWeapComp(weapCompAttacheType);
   //(*object) = nullptr;
   //cc = gcc;
-  rulesForAdding   = rulesForAdding_Mag;
-  rulesForRemoving = rulesForRemoving_Mag;
+  //rulesForAdding   = rulesForAdding_Mag;
+  //rulesForRemoving = rulesForRemoving_Mag;
   ////feedPort->cc.reachableMag      = gcc.reachableMag;
 }
 
@@ -1815,7 +1846,7 @@ int main()
 
   //Firing
   weapComp_Port   *feedPort
-    = new weapComp_Port("FeedPort", weaponComponent::FEEDPORT, weaponComponent::MAGIZINE);
+    = new weapComp_Port("FeedPort", weaponComponent::FEEDPORT, new modCompCond_Mag);
   weapComp_Round  *bolt
     = new weapComp_Round("Bolt", weaponComponent::BOLT);
   weapComp_Round  *chamber
