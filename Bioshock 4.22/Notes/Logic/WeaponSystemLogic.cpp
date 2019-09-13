@@ -261,10 +261,6 @@ struct modCompCondtional
   : weapCompAttacheType(weapCompAttacheType_)
   {}
 
-  //modCompCondtional(const modCompCondtional & other)
-  //: weapCompAttacheType(other.weapCompAttacheType)
-  //{}
-
   const weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType;
   virtual weaponComponent* rulesForAdding() = 0;
   virtual bool rulesForRemoving() = 0;
@@ -299,20 +295,6 @@ struct weaponSystem
     }
   }
 
-  //DEPRECATED
-#if 0
-  void modComp(weaponComponent*& weapComp,
-               weaponComponent* (*rules)())
-  {
-    weapComp = rules();
-
-    if(weapComp != nullptr)
-    {
-      weapComp->parent = this;
-    }
-  }
-#endif
-
   unsigned weaponRoundCount();
 
 private:
@@ -329,7 +311,19 @@ public:
     return weapComps[key];
   }
 
-  void addWeapComp(weaponComponent* weapComp);
+  void addWeapComp(weaponComponent* weapComp)
+  {
+    if(weapComp != nullptr)
+    {
+      weapComp->parent = this;
+
+        //Valid type check
+      if(weapComp->wcType < weapComps.capacity())
+      {
+        weapComps[weapComp->wcType] = weapComp;
+      }
+    }
+  }
 
   void removeWeapComp(weaponComponent::WEAP_COMPS_ENUMS type)
   {
@@ -1157,26 +1151,7 @@ private:
   unsigned maxRoundCount = 1;
 };
 
-//DEPRECATED
-#if 0
-struct colliderConditional
-{
-  colliderConditional()
-  {
-    reinterpret_cast<weapComp_Mag*>(reachableMag)->Reset();
-  }
-
-  weaponComponent* reachableMag
-    = new weapComp_Mag("Magizine", weaponComponent::MAGIZINE, 10);
-};
-
-static colliderConditional gcc;
-#endif
-
 //Responsible for making REQUESTS to the system to add & remove set weaponComponents
-  //T is a weapComp_Mag
-  // ^In the specific use case in which this prototype is being developed
-  //^DEPRECATED
 struct weapComp_Port : public weaponComponent
 {
   weapComp_Port(
@@ -1188,22 +1163,9 @@ struct weapComp_Port : public weaponComponent
     , modCompCond(modCompCond_)
   {}
 
-  //weapComp_Port(const weapComp_Port& other)
-  //  : weaponComponent(other.name, other.wcType)
-  //  , modCompCond(other.modCompCond)
-  //{}
-
   virtual ~weapComp_Port(){}
 
   modCompCondtional *modCompCond;
-
-    //MOVED: To modCompCondtional
-  //const weaponComponent::WEAP_COMPS_ENUMS weapCompAttacheType;
-  //weaponComponent **object = nullptr;
-  //colliderConditional cc;
-
-  //weaponComponent* (*rulesForAdding)()   = nullptr;
-  //weaponComponent* (*rulesForRemoving)() = nullptr;
 
   void connectComp();
 
@@ -1788,45 +1750,6 @@ struct modCompCond_Mag : public modCompCondtional
     return true;
   }
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//Function Definitions
-
-void weaponSystem::addWeapComp(weaponComponent* weapComp)
-{
-  if(weapComp != nullptr)
-  {
-    weapComp->parent = this;
-
-    if(weapComp->wcType == weaponComponent::FEEDPORT)
-    {
-      std::cout << "weapComp->wcType == weaponComponent::FEEDPORT" << std::endl;
-
-      reinterpret_cast<weapComp_Port*>(weapComp)->connectComp();
-
-      //reinterpret_cast<weapComp_Port*>(weapComp)->object
-      //  = &weapComps[reinterpret_cast<weapComp_Port*>(weapComp)->weapCompAttacheType];
-      //(*reinterpret_cast<weapComp_Port*>(weapComp)->object)            = nullptr;
-      //reinterpret_cast<weapComp_Port*>(weapComp)->cc                   = gcc;
-      //reinterpret_cast<weapComp_Port*>(weapComp)->rulesForAdding       = rulesForAdding_Mag;
-      //reinterpret_cast<weapComp_Port*>(weapComp)->rulesForRemoving     = rulesForRemoving_Mag;
-      ////feedPort->cc.reachableMag      = gcc.reachableMag;
-    }
-
-    if(weapComp->wcType < weapComps.capacity())
-    weapComps[weapComp->wcType] = weapComp;
-  }
-}
-
-void weapComp_Port::connectComp()
-{
-  //object = &parent->getWeapComp(weapCompAttacheType);
-  //(*object) = nullptr;
-  //cc = gcc;
-  //rulesForAdding   = rulesForAdding_Mag;
-  //rulesForRemoving = rulesForRemoving_Mag;
-  ////feedPort->cc.reachableMag      = gcc.reachableMag;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //LOGIC EXECUTION
