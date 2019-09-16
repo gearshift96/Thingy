@@ -6,10 +6,13 @@ NAME=FOO
 TYPE=cpp
 
 gnu:
-	$(CC) $(CFLAGS) $(CFLAGS_EXTRA) $(NAME).$(TYPE) -o $(NAME) && ./$(NAME)
+	$(CC) $(CFLAGS) $(CFLAGS_EXTRA) $(NAME).$(TYPE) -o $(NAME).exe && ./$(NAME)
 
 build:
-	$(CC) $(CFLAGS) $(CFLAGS_EXTRA) $(NAME).$(TYPE) -o $(NAME)
+	$(CC) $(CFLAGS) $(CFLAGS_EXTRA) $(NAME).$(TYPE) -o $(NAME).exe
+
+run:
+	./$(NAME)
 
 ms:
 	cl $(MSFLAGS) $(NAME).$(TYPE) && ./$(NAME)
